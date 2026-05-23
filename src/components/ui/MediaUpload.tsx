@@ -1,31 +1,32 @@
 /**
  * MediaUpload — reusable click-to-upload component with optional image crop
  *
+ * Uploads to the Express backend at VITE_API_BASE_URL/api/upload
+ * Files are stored in server/uploads/ and served as static assets.
+ *
  * Props:
  *   value       – current public URL (shown as preview)
  *   onChange    – called with the new public URL after upload
  *   accept      – 'image' | 'video' | 'both'  (default 'image')
  *   label       – field label shown above the dropzone
- *   aspect      – optional crop aspect ratio (e.g. 16/9, 1). Image mode only.
+ *   aspect      – optional crop aspect ratio for images (e.g. 16/9, 1)
  *   className   – extra classes on the root wrapper
  *
- * Limits enforced client-side:
- *   images  → 2 MB (compressed to WEBP/1080p/0.8q if over limit)
- *   videos  → 5 MB (no auto-compression — user must trim first)
- *
- * Files are stored in the Supabase `uploads` bucket under:
- *   uploads/<type>/<uuid>.<ext>
+ * Limits (client-side guard; server also validates):
+ *   images → 10 MB  (server compresses to WEBP/1080p via sharp)
+ *   videos → 50 MB  (stored as-is)
  */
 
 import { useRef, useState } from 'react'
 import { Upload, X, ImageIcon, Video, Loader2 } from 'lucide-react'
-import { supabase } from '@/db/supabase'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import ImageCrop from '@/components/ui/ImageCrop'
 
-const IMAGE_LIMIT = 2 * 1024 * 1024   // 2 MB
-const VIDEO_LIMIT = 5 * 1024 * 1024   // 5 MB
+const IMAGE_LIMIT = 10 * 1024 * 1024   // 10 MB
+const VIDEO_LIMIT = 50 * 1024 * 1024   // 50 MB
+
+const API_BASE = (import.meta.env.VITE_API_BASE_URL as string) || 'http://localhost:4000'
 
 type Accept = 'image' | 'video' | 'both'
 
@@ -34,53 +35,14 @@ interface MediaUploadProps {
   onChange: (url: string) => void
   accept?: Accept
   label?: string
-  aspect?: number        // e.g. 16/9, 1 (square). Only applies for images.
+  aspect?: number
   className?: string
-}
-
-// ─── Image compression helper ────────────────────────────────────
-async function compressImage(file: File): Promise<File> {
-  return new Promise((resolve, reject) => {
-    const img = new Image()
-    const objectUrl = URL.createObjectURL(file)
-    img.onload = () => {
-      URL.revokeObjectURL(objectUrl)
-      const MAX_SIDE = 1080
-      let { width, height } = img
-      if (width > MAX_SIDE || height > MAX_SIDE) {
-        if (width > height) { height = Math.round((height / width) * MAX_SIDE); width = MAX_SIDE }
-        else { width = Math.round((width / height) * MAX_SIDE); height = MAX_SIDE }
-      }
-      const canvas = document.createElement('canvas')
-      canvas.width = width; canvas.height = height
-      const ctx = canvas.getContext('2d')!
-      ctx.drawImage(img, 0, 0, width, height)
-      let quality = 0.8
-      const tryCompress = () => {
-        canvas.toBlob(blob => {
-          if (!blob) { reject(new Error('Canvas to blob failed')); return }
-          if (blob.size <= IMAGE_LIMIT || quality <= 0.3) {
-            resolve(new File([blob], file.name.replace(/\.[^.]+$/, '.webp'), { type: 'image/webp' }))
-          } else { quality -= 0.1; tryCompress() }
-        }, 'image/webp', quality)
-      }
-      tryCompress()
-    }
-    img.onerror = reject
-    img.src = objectUrl
-  })
-}
-
-// ─── Sanitise filename (letters + numbers only) ──────────────────
-function sanitiseName(name: string) {
-  return name.replace(/[^a-zA-Z0-9.]/g, '_').toLowerCase()
 }
 
 export default function MediaUpload({ value, onChange, accept = 'image', label, aspect, className }: MediaUploadProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
   const [progress, setProgress] = useState(0)
-  // Crop state: null = no crop pending, string = object URL of file awaiting crop
   const [cropSrc, setCropSrc] = useState<string | null>(null)
   const pendingFileRef = useRef<File | null>(null)
 
@@ -90,92 +52,83 @@ export default function MediaUpload({ value, onChange, accept = 'image', label, 
     ? 'video/mp4,video/webm,video/ogg,video/quicktime'
     : 'image/jpeg,image/png,image/gif,image/webp,image/avif,video/mp4,video/webm,video/ogg,video/quicktime'
 
-  // ── Core upload logic (runs after optional crop) ──────────────
-  const uploadFile = async (file: File) => {
-    setUploading(true); setProgress(0)
+  // ── POST multipart to Express /api/upload ─────────────────────
+  const uploadToServer = async (file: File) => {
+    setUploading(true)
+    setProgress(0)
 
-    const ext = file.name.split('.').pop() || 'bin'
-    const folder = file.type.startsWith('video/') ? 'videos' : 'images'
-    const uuid = crypto.randomUUID().replace(/-/g, '')
-    const path = `${folder}/${uuid}_${sanitiseName(file.name.replace(/\.[^.]+$/, ''))}.${ext}`
+    const tick = setInterval(() => setProgress(p => Math.min(p + 10, 88)), 200)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
 
-    const progressInterval = setInterval(() => setProgress(p => Math.min(p + 12, 88)), 150)
-    const { error } = await supabase.storage.from('uploads').upload(path, file, {
-      cacheControl: '3600', upsert: false, contentType: file.type,
-    })
-    clearInterval(progressInterval); setProgress(100)
+      const res = await fetch(`${API_BASE}/api/upload`, {
+        method: 'POST',
+        body: formData,
+      })
 
-    if (error) {
-      toast.error(`Upload failed: ${error.message}`)
-      setUploading(false); setProgress(0); return
+      clearInterval(tick)
+      setProgress(100)
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ error: res.statusText }))
+        throw new Error(body.error || 'Upload failed')
+      }
+
+      const { url } = await res.json()
+      // url is relative e.g. /uploads/abc.webp — prepend API_BASE for full URL
+      onChange(`${API_BASE}${url}`)
+      toast.success('File uploaded successfully')
+    } catch (err: any) {
+      toast.error(`Upload failed: ${err.message}`)
+    } finally {
+      setUploading(false)
+      setProgress(0)
     }
-    const { data: urlData } = supabase.storage.from('uploads').getPublicUrl(path)
-    onChange(urlData.publicUrl)
-    toast.success('File uploaded successfully')
-    setUploading(false); setProgress(0)
   }
 
-  // ── File selected (from input or drop) ───────────────────────
+  // ── File selected from input or drop ─────────────────────────
   const handleFile = async (file: File) => {
     const isVideo = file.type.startsWith('video/')
     const isImage = file.type.startsWith('image/')
+
     if (!isImage && !isVideo) { toast.error('Unsupported file type'); return }
     if (accept === 'image' && !isImage) { toast.error('Please select an image file'); return }
     if (accept === 'video' && !isVideo) { toast.error('Please select a video file'); return }
 
     if (isVideo) {
       if (file.size > VIDEO_LIMIT) {
-        toast.error(`Video exceeds 5 MB (${(file.size / 1024 / 1024).toFixed(1)} MB). Please trim or compress first.`)
+        toast.error(`Video exceeds 50 MB (${(file.size / 1024 / 1024).toFixed(1)} MB). Please compress it first.`)
         return
       }
-      await uploadFile(file)
+      await uploadToServer(file)
       return
     }
 
-    // Images: show crop first, then compress + upload on confirm
-    const objUrl = URL.createObjectURL(file)
+    // Images — open crop tool first
+    if (file.size > IMAGE_LIMIT) {
+      toast.error(`Image exceeds 10 MB (${(file.size / 1024 / 1024).toFixed(1)} MB). Please use a smaller file.`)
+      return
+    }
     pendingFileRef.current = file
-    setCropSrc(objUrl)
+    setCropSrc(URL.createObjectURL(file))
   }
 
   // ── Crop confirmed ────────────────────────────────────────────
   const handleCropConfirm = async (croppedFile: File) => {
     if (cropSrc) URL.revokeObjectURL(cropSrc)
-    setCropSrc(null); pendingFileRef.current = null
-
-    let toUpload = croppedFile
-    if (toUpload.size > IMAGE_LIMIT) {
-      toast.info('Compressing image…')
-      try {
-        toUpload = await compressImage(toUpload)
-        toast.success(`Compressed to ${(toUpload.size / 1024).toFixed(0)} KB`)
-      } catch {
-        toast.error('Compression failed — try a smaller image')
-        return
-      }
-    }
-    await uploadFile(toUpload)
+    setCropSrc(null)
+    pendingFileRef.current = null
+    await uploadToServer(croppedFile)
   }
 
-  // ── Crop skipped (upload original with optional compression) ──
+  // ── Crop skipped — upload original ────────────────────────────
   const handleCropSkip = async () => {
     const file = pendingFileRef.current
     if (cropSrc) URL.revokeObjectURL(cropSrc)
-    setCropSrc(null); pendingFileRef.current = null
-    if (!file) return
-
-    let toUpload = file
-    if (toUpload.size > IMAGE_LIMIT) {
-      toast.info('Image is too large — compressing…')
-      try {
-        toUpload = await compressImage(toUpload)
-        toast.success(`Compressed to ${(toUpload.size / 1024).toFixed(0)} KB`)
-      } catch {
-        toast.error('Compression failed — try a smaller image')
-        return
-      }
-    }
-    await uploadFile(toUpload)
+    setCropSrc(null)
+    pendingFileRef.current = null
+    if (file) await uploadToServer(file)
   }
 
   const handleDrop = (e: React.DragEvent) => {
@@ -250,9 +203,9 @@ export default function MediaUpload({ value, onChange, accept = 'image', label, 
               {uploading ? 'Uploading…' : 'Click or drag & drop to upload'}
             </p>
             <p className="text-xs text-muted-foreground mt-0.5">
-              {accept === 'image' && 'JPEG · PNG · WEBP · GIF — max 2 MB'}
-              {accept === 'video' && 'MP4 · WEBM · MOV — max 5 MB'}
-              {accept === 'both' && 'Images (max 2 MB) · Videos (max 5 MB)'}
+              {accept === 'image' && 'JPEG · PNG · WEBP · GIF — max 10 MB'}
+              {accept === 'video' && 'MP4 · WEBM · MOV — max 50 MB'}
+              {accept === 'both' && 'Images (max 10 MB) · Videos (max 50 MB)'}
             </p>
             {accept !== 'video' && (
               <p className="text-xs text-primary mt-0.5 font-medium">✂ Crop tool opens automatically for images</p>
@@ -289,5 +242,3 @@ export default function MediaUpload({ value, onChange, accept = 'image', label, 
     </div>
   )
 }
-
-
