@@ -1,0 +1,1 @@
+ALTER TABLE portfolio_works ADD COLUMN video_url text;

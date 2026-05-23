@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="apple-touch-icon" href="/favicon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#166534" />
+    <!-- Paystack inline checkout -->
+    <script src="https://js.paystack.co/v1/inline.js"></script>
+    <style>
+      #splash { position:fixed; inset:0; z-index:9999; background:#fff; display:flex; align-items:center; justify-content:center; transition:opacity 0.5s; }
+      #splash.hidden { opacity:0; pointer-events:none; }
+      #splash img { max-width:180px; height:auto; animation:pulse 1.5s ease-in-out infinite; }
+      @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.05)} }
+    </style>
+  </head>
+  <body>
+    <div id="splash">
+      <img src="https://miaoda-conversation-file.s3cdn.medo.dev/user-bo1v51m4ml1c/app-bu4kziuqa9dt/20260523/logo.jpeg" alt="Stay Jazzy Multimedia" />
+    </div>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+    <script>
+      window.addEventListener('load', function() {
+        setTimeout(function() {
+          var s = document.getElementById('splash');
+          if (s) { s.classList.add('hidden'); setTimeout(function(){ s.remove(); }, 500); }
+        }, 1200);
+      });
+    </script>
+  </body>
+</html>
