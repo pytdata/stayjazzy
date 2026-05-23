@@ -26,7 +26,8 @@ import ImageCrop from '@/components/ui/ImageCrop'
 const IMAGE_LIMIT = 10 * 1024 * 1024   // 10 MB
 const VIDEO_LIMIT = 50 * 1024 * 1024   // 50 MB
 
-const API_BASE = (import.meta.env.VITE_API_BASE_URL as string) || 'http://localhost:4000'
+// When empty or not set, use relative paths so Vite dev-server proxy handles /api and /uploads
+const API_BASE = (import.meta.env.VITE_API_BASE_URL as string)?.trim() || ''
 
 type Accept = 'image' | 'video' | 'both'
 

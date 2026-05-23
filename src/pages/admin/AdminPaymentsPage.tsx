@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import {
-  CreditCard, FileText, Receipt, DollarSign, TrendingUp, CheckCircle, XCircle, Clock,
+  CreditCard, FileText, DollarSign, TrendingUp, CheckCircle, XCircle, Clock,
   Download, Plus, Eye, AlertTriangle
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
