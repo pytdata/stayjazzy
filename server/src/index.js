@@ -18,8 +18,8 @@ app.use(cors({
 }))
 app.use(express.json())
 
-// Serve uploaded files as static assets
-app.use('/uploads', express.static(path.resolve(__dirname, '../../uploads')))
+// Serve uploaded files as static assets (server/uploads/ relative to server/src/)
+app.use('/uploads', express.static(path.resolve(__dirname, '../uploads')))
 
 // Health check
 app.get('/api/health', (_req, res) => res.json({ status: 'ok', service: 'Stay Jazzy API' }))
