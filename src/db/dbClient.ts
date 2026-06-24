@@ -90,6 +90,7 @@ class QueryBuilder implements PromiseLike<any> {
   }
 
   or(condition: string) {
+    this._matchObj['_or'] = condition
     return this
   }
 

@@ -7,7 +7,7 @@ const ALLOWED_TABLES = [
   'hero_slides', 'service_packages', 'sub_services', 'pricing_tiers', 'pricing_features', 
   'portfolio_works', 'team_members', 'faqs', 'client_logos', 'site_content', 
   'newsletter_subscribers', 'contact_messages', 'bookings', 'chat_messages', 
-  'page_views', 'admins', 'booking_stages', 'chat_settings', 'chat_default_responses', 
+  'page_views', 'admins', 'otps', 'booking_stages', 'chat_settings', 'chat_default_responses', 
   'chat_conversations', 'chat_leads', 'payment_transactions', 'payment_requests', 
   'invoices', 'receipts', 'company_settings', 'seo_settings', 'portfolio_categories'
 ];
@@ -30,10 +30,29 @@ router.post('/:table', async (req, res) => {
       if (!matchObj || Object.keys(matchObj).length === 0) return '';
       const clauses = [];
       for (const [k, v] of Object.entries(matchObj)) {
-        clauses.push(`${k} = $${paramIdx++}`);
-        params.push(v);
+        if (k === '_count' || k === '_head' || k === '_onConflict') continue;
+        
+        if (k === '_or') {
+          const orConditions = v.split(',');
+          const orClauses = orConditions.map(cond => {
+            const parts = cond.split('.eq.');
+            if (parts.length === 2) {
+              const col = parts[0];
+              const val = parts[1];
+              params.push(val);
+              return `${col} = $${paramIdx++}`;
+            }
+            return '';
+          }).filter(c => c);
+          if (orClauses.length > 0) {
+            clauses.push(`(${orClauses.join(' OR ')})`);
+          }
+        } else {
+          clauses.push(`${k} = $${paramIdx++}`);
+          params.push(v);
+        }
       }
-      return 'WHERE ' + clauses.join(' AND ');
+      return clauses.length ? 'WHERE ' + clauses.join(' AND ') : '';
     };
 
     if (action === 'select') {

@@ -319,7 +319,7 @@ export async function getPageViews(): Promise<PageView[]> {
 
 // ─── ADMIN AUTH ────────────────────────────────────────────────
 export async function getAdminByEmail(email: string): Promise<{ id: string; email: string; password_hash: string; role: string } | null> {
-  const { data } = await supabase.from('admin_accounts').select('id, email, password_hash, role').eq('email', email).maybeSingle()
+  const { data } = await supabase.from('admins').select('id, email, password_hash, role').eq('email', email).maybeSingle()
   return data as { id: string; email: string; password_hash: string; role: string } | null
 }
 

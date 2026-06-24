@@ -11,6 +11,7 @@ import { paystackRouter } from './routes/paystack.js'
 import dbRouter from './routes/crud.js'
 import { emailRouter } from './routes/email.js'
 import { authRouter } from './routes/auth.js'
+import { uploadRouter } from './routes/upload.js'
 import { query } from './db.js'
 import bcrypt from 'bcryptjs'
 
@@ -46,6 +47,7 @@ app.use('/api/sms', smsRouter)
 app.use('/api/paystack', paystackRouter)
 app.use('/api/v1/db', dbRouter)
 app.use('/api/email', emailRouter)
+app.use('/api/upload/file', uploadRouter)
 
 // Socket.IO
 io.on('connection', (socket) => {
