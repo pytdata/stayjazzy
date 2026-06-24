@@ -4,7 +4,11 @@ import react from "@vitejs/plugin-react";
 import svgr from "vite-plugin-svgr";
 import path from "path";
 
+// Added this comment to trigger Vite full restart
 export default defineConfig({
+  optimizeDeps: {
+    force: true,
+  },
   plugins: [
     react(),
     miaodaDevPlugin(),
