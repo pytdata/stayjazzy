@@ -125,7 +125,7 @@ export default function AdminLoginPage() {
                     className="bg-white/10 border-white/20 text-white placeholder:text-white/30" placeholder="admin@stayjazzymultimedia.com" />
                 </div>
                 <div className="flex gap-2 mt-2">
-                  <Button type="button" variant="outline" onClick={() => setMode('login')} className="flex-1 bg-transparent border-white/20 text-white hover:bg-white/10">
+                  <Button type="button" variant="ghost" onClick={() => setMode('login')} className="flex-1 border border-white/60 text-white hover:bg-white/10">
                     Cancel
                   </Button>
                   <Button type="submit" disabled={loading} className="flex-1 bg-primary text-primary-foreground">
@@ -153,7 +153,7 @@ export default function AdminLoginPage() {
                     className="bg-white/10 border-white/20 text-white placeholder:text-white/30" placeholder="••••••••" />
                 </div>
                 <div className="flex gap-2 mt-2">
-                  <Button type="button" variant="outline" onClick={() => setMode('login')} className="flex-1 bg-transparent border-white/20 text-white hover:bg-white/10">
+                  <Button type="button" variant="ghost" onClick={() => setMode('login')} className="flex-1 border border-white/60 text-white hover:bg-white/10">
                     Cancel
                   </Button>
                   <Button type="submit" disabled={loading} className="flex-1 bg-primary text-primary-foreground">
