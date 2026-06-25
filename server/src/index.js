@@ -1,21 +1,16 @@
+// ============================================================
+// Traditional Node server entry (long-running host / local dev)
+// ------------------------------------------------------------
+// Wraps the shared Express app with an HTTP server + Socket.IO and
+// binds a port. On serverless (Vercel) the app is served via
+// api/index.js instead, where Socket.IO is not used.
+// ============================================================
 import 'dotenv/config'
-import express from 'express'
-import cors from 'cors'
-import path from 'path'
-import { fileURLToPath } from 'url'
 import { createServer } from 'http'
 import { Server } from 'socket.io'
 
-import { smsRouter } from './routes/sms.js'
-import { paystackRouter } from './routes/paystack.js'
-import dbRouter from './routes/crud.js'
-import { emailRouter } from './routes/email.js'
-import { authRouter } from './routes/auth.js'
-import { uploadRouter } from './routes/upload.js'
-import { ensureSchema, migrate } from './schema.js'
+import app, { ensureSchema } from './app.js'
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const app = express()
 const httpServer = createServer(app)
 
 const io = new Server(httpServer, {
@@ -26,38 +21,6 @@ const io = new Server(httpServer, {
 })
 
 const PORT = process.env.PORT || 4000
-
-app.use(cors({
-  origin: process.env.ALLOWED_ORIGIN || '*',
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-}))
-app.use(express.json())
-
-// Serve static assets if any
-app.use('/uploads', express.static(path.resolve(__dirname, '../uploads')))
-
-// Health check
-app.get('/api/health', (_req, res) => res.json({ status: 'ok', service: 'Stay Jazzy API' }))
-
-// Manual schema bootstrap — visit this URL once after deploy (or any time) to
-// (re)create all tables and seed defaults. Idempotent and safe to re-run.
-app.all('/api/migrate', async (_req, res) => {
-  try {
-    await migrate()
-    res.json({ ok: true, message: 'Database tables created/verified.' })
-  } catch (error) {
-    res.status(500).json({ ok: false, message: 'Bootstrap failed.', error: String(error) })
-  }
-})
-
-// Routes
-app.use('/api/auth', authRouter)
-app.use('/api/sms', smsRouter)
-app.use('/api/paystack', paystackRouter)
-app.use('/api/v1/db', dbRouter)
-app.use('/api/email', emailRouter)
-app.use('/api/upload/file', uploadRouter)
 
 // Socket.IO
 io.on('connection', (socket) => {
@@ -79,12 +42,11 @@ io.on('connection', (socket) => {
 
 httpServer.listen(PORT, async () => {
   try {
-    await ensureSchema();
+    await ensureSchema()
   } catch {
-    console.error('Schema bootstrap failed on startup. Ensure DATABASE_URL is correct.');
+    console.error('Schema bootstrap failed on startup. Ensure DATABASE_URL is correct.')
   }
   console.log(`Stay Jazzy API & Socket.IO server running on port ${PORT}`)
 })
 
-// Export the app so serverless platforms (e.g. Vercel) can mount it as a handler
 export default app
