@@ -12,8 +12,7 @@ import dbRouter from './routes/crud.js'
 import { emailRouter } from './routes/email.js'
 import { authRouter } from './routes/auth.js'
 import { uploadRouter } from './routes/upload.js'
-import { query } from './db.js'
-import bcrypt from 'bcryptjs'
+import { ensureSchema } from './schema.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
@@ -67,40 +66,14 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {})
 })
 
-// Auto-seed admin user
-const seedAdmin = async () => {
-  try {
-    const checkTable = await query(`
-      SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'admins');
-    `);
-    if (!checkTable.rows[0].exists) {
-      await query(`
-        CREATE TABLE admins (
-          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-          email TEXT UNIQUE NOT NULL,
-          password_hash TEXT NOT NULL,
-          reset_otp TEXT,
-          reset_otp_expires_at TIMESTAMP WITH TIME ZONE,
-          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-        )
-      `);
-      console.log('Created admins table');
-    }
-
-    const email = 'admin@stayjazzymultimedia.com';
-    const password = 'admin@123';
-    const hash = await bcrypt.hash(password, 10);
-    const res = await query('SELECT * FROM admins WHERE email = $1', [email]);
-    if (res.rows.length === 0) {
-      await query('INSERT INTO admins (email, password_hash) VALUES ($1, $2)', [email, hash]);
-      console.log('Inserted admin user admin@stayjazzymultimedia.com');
-    }
-  } catch (err) {
-    console.error('Auto-seed admin failed. Ensure DATABASE_URL is correct.');
-  }
-}
-
 httpServer.listen(PORT, async () => {
-  await seedAdmin();
+  try {
+    await ensureSchema();
+  } catch {
+    console.error('Schema bootstrap failed on startup. Ensure DATABASE_URL is correct.');
+  }
   console.log(`Stay Jazzy API & Socket.IO server running on port ${PORT}`)
 })
+
+// Export the app so serverless platforms (e.g. Vercel) can mount it as a handler
+export default app

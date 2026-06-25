@@ -1,7 +1,12 @@
 import express from 'express';
 import { query } from '../db.js';
+import { ensureSchema } from '../schema.js';
 
 const router = express.Router();
+
+// Encode JS objects/arrays for jsonb columns; pass scalars through untouched.
+const prepValue = (v) =>
+  v !== null && typeof v === 'object' && !(v instanceof Date) ? JSON.stringify(v) : v;
 
 const ALLOWED_TABLES = [
   'hero_slides', 'service_packages', 'sub_services', 'pricing_tiers', 'pricing_features', 
@@ -21,6 +26,10 @@ router.post('/:table', async (req, res) => {
   const { action, match, data, order, limit, select } = req.body;
 
   try {
+    // Make sure the schema exists before touching any table (covers fresh /
+    // serverless deployments where the startup hook may not have run).
+    await ensureSchema();
+
     let sql = '';
     let params = [];
     let paramIdx = 1;
@@ -76,7 +85,7 @@ router.post('/:table', async (req, res) => {
         const itemPl = [];
         keys.forEach(k => {
           itemPl.push(`$${paramIdx++}`);
-          params.push(item[k]);
+          params.push(prepValue(item[k]));
         });
         return `(${itemPl.join(', ')})`;
       });
@@ -85,7 +94,7 @@ router.post('/:table', async (req, res) => {
     } else if (action === 'update') {
       const keys = Object.keys(data);
       const setClauses = keys.map(k => `${k} = $${paramIdx++}`);
-      for (const k of keys) params.push(data[k]);
+      for (const k of keys) params.push(prepValue(data[k]));
       
       const whereClause = buildWhere(match);
       if (!whereClause) throw new Error('Update requires match condition');
@@ -96,11 +105,12 @@ router.post('/:table', async (req, res) => {
       if (!whereClause) throw new Error('Delete requires match condition');
       sql = `DELETE FROM ${table} ${whereClause} RETURNING *`;
     } else if (action === 'upsert') {
-       // Simple upsert based on id or specific keys. Assuming 'id' is primary key if not specified.
+       // Upsert on the caller-supplied conflict target (defaults to the primary key).
+       const conflictTarget = (match && match._onConflict) || 'id';
        const keys = Object.keys(data);
-       const valuesPl = keys.map(k => { params.push(data[k]); return `$${paramIdx++}`; });
-       const updateSet = keys.filter(k => k !== 'id').map(k => `${k} = EXCLUDED.${k}`);
-       sql = `INSERT INTO ${table} (${keys.join(', ')}) VALUES (${valuesPl.join(', ')}) ON CONFLICT (id) DO UPDATE SET ${updateSet.join(', ')} RETURNING *`;
+       const valuesPl = keys.map(k => { params.push(prepValue(data[k])); return `$${paramIdx++}`; });
+       const updateSet = keys.filter(k => k !== conflictTarget).map(k => `${k} = EXCLUDED.${k}`);
+       sql = `INSERT INTO ${table} (${keys.join(', ')}) VALUES (${valuesPl.join(', ')}) ON CONFLICT (${conflictTarget}) DO UPDATE SET ${updateSet.join(', ')} RETURNING *`;
     } else {
       return res.status(400).json({ error: 'Invalid action' });
     }
