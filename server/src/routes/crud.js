@@ -116,14 +116,18 @@ router.post('/:table', async (req, res) => {
     }
 
     const result = await query(sql, params);
-    
-    // For single insert/update returning
-    if ((action === 'insert' && !Array.isArray(data)) || action === 'update' || action === 'delete') {
-      if (req.body.single && result.rows.length <= 1) {
+
+    // When the caller used .single()/.maybeSingle(), return a single object
+    // (or null) instead of an array — for reads as well as writes.
+    if (req.body.single) {
+      if (action === 'select') {
+        return res.json(result.rows[0] ?? null);
+      }
+      if (((action === 'insert' && !Array.isArray(data)) || action === 'update' || action === 'delete') && result.rows.length <= 1) {
         return res.json(result.rows[0] || null);
       }
     }
-    
+
     res.json(result.rows);
   } catch (error) {
     console.error(`DB Error (${table} ${action}):`, error);
