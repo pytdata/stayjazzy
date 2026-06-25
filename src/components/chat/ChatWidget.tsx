@@ -23,7 +23,7 @@ function getVisitorId() {
 }
 
 function isWithinHours(settings: ChatSettings | null) {
-  if (!settings) return true
+  if (!settings || !settings.active_start || !settings.active_end) return true
   const now = new Date()
   const tz = settings.timezone || 'Africa/Accra'
   const timeStr = now.toLocaleTimeString('en-GB', { timeZone: tz, hour12: false })

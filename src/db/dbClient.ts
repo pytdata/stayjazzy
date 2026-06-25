@@ -26,7 +26,10 @@ class QueryBuilder implements PromiseLike<any> {
   }
 
   select(cols = '*', options?: { count?: string, head?: boolean }) {
-    this._action = 'select'
+    // When chained after a write (e.g. .insert(...).select()), keep the write
+    // action so the row is actually inserted/updated and returned — don't
+    // downgrade it to a plain SELECT.
+    if (!['insert', 'update', 'upsert', 'delete'].includes(this._action)) this._action = 'select'
     this._selectCols = cols
     if (options?.count) this._matchObj['_count'] = options.count
     if (options?.head) this._matchObj['_head'] = options.head
