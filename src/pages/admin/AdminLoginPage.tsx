@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { toast } from 'sonner'
 import { Loader2, Lock } from 'lucide-react'
+import { API_BASE } from '@/lib/apiBase'
 
 export default function AdminLoginPage() {
   const { signIn, admin } = useAuth()
@@ -37,7 +38,7 @@ export default function AdminLoginPage() {
     if (!email) return toast.error('Please enter your email')
     setLoading(true)
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000'}/api/auth/reset-password-request`, {
+      const res = await fetch(`${API_BASE}/api/auth/reset-password-request`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email })
@@ -56,7 +57,7 @@ export default function AdminLoginPage() {
     if (newPassword !== confirmPassword) return toast.error('Passwords do not match')
     setLoading(true)
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000'}/api/auth/reset-password-verify`, {
+      const res = await fetch(`${API_BASE}/api/auth/reset-password-verify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, otp, newPassword })

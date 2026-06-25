@@ -2,6 +2,7 @@
 // API layer — all data access via Supabase
 // ============================================================
 import { db as supabase } from './dbClient'
+import { API_BASE } from '@/lib/apiBase'
 import type {
   HeroSlide, ServicePackage, SubService, PricingTier, PricingFeature,
   PortfolioCategory, PortfolioWork, TeamMember, FAQ, ClientLogo, SiteContent,
@@ -205,7 +206,7 @@ export async function getNewsletterSubscribers(): Promise<NewsletterSubscriber[]
 export async function submitContactMessage(msg: Partial<ContactMessage>) {
   const res = await supabase.from('contact_messages').insert(msg)
   if (!res.error) {
-    fetch('/api/email/send', {
+    fetch(`${API_BASE}/api/email/send`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -250,7 +251,7 @@ export async function createBooking(booking: Partial<Booking>): Promise<Booking>
   const { data, error } = await supabase.from('bookings').insert(booking).single()
   if (error) throw error
   
-  fetch('/api/email/send', {
+  fetch(`${API_BASE}/api/email/send`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
