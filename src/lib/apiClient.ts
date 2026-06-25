@@ -3,8 +3,7 @@
  * All calls to /api/* are routed through here.
  */
 
-// When empty, requests go through the Vite dev-server proxy to the Express backend
-const BASE = (import.meta.env.VITE_API_BASE_URL as string)?.trim() || ''
+import { API_BASE as BASE } from '@/lib/apiBase'
 
 async function request<T = unknown>(
   path: string,

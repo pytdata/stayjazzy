@@ -1,7 +1,7 @@
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000'
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || API_BASE
-
 import { io, Socket } from 'socket.io-client'
+import { API_BASE, SOCKET_BASE } from '@/lib/apiBase'
+
+const SOCKET_URL = SOCKET_BASE
 
 let socketInstance: Socket | null = null
 const getSocket = () => {
