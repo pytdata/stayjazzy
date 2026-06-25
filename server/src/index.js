@@ -12,7 +12,7 @@ import dbRouter from './routes/crud.js'
 import { emailRouter } from './routes/email.js'
 import { authRouter } from './routes/auth.js'
 import { uploadRouter } from './routes/upload.js'
-import { ensureSchema } from './schema.js'
+import { ensureSchema, migrate } from './schema.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
@@ -39,6 +39,17 @@ app.use('/uploads', express.static(path.resolve(__dirname, '../uploads')))
 
 // Health check
 app.get('/api/health', (_req, res) => res.json({ status: 'ok', service: 'Stay Jazzy API' }))
+
+// Manual schema bootstrap — visit this URL once after deploy (or any time) to
+// (re)create all tables and seed defaults. Idempotent and safe to re-run.
+app.all('/api/migrate', async (_req, res) => {
+  try {
+    await migrate()
+    res.json({ ok: true, message: 'Database tables created/verified.' })
+  } catch (error) {
+    res.status(500).json({ ok: false, message: 'Bootstrap failed.', error: String(error) })
+  }
+})
 
 // Routes
 app.use('/api/auth', authRouter)

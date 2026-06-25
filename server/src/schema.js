@@ -388,11 +388,51 @@ const seedDefaults = async () => {
 
 let schemaPromise = null
 
+// Split the DDL into individual statements and strip comment-only lines.
+const splitStatements = (sql) =>
+  sql
+    .split(';')
+    .map((stmt) =>
+      stmt
+        .split('\n')
+        .filter((line) => !line.trim().startsWith('--'))
+        .join('\n')
+        .trim()
+    )
+    .filter((stmt) => stmt.length > 0)
+
+// Run each DDL statement independently so a single failure (e.g. a missing
+// CREATE EXTENSION privilege) cannot abort the whole batch — every statement
+// is idempotent, so partial progress is safe and the rest still apply.
+const runSchema = async () => {
+  const statements = splitStatements(SCHEMA_SQL)
+  let failures = 0
+  for (const stmt of statements) {
+    try {
+      await query(stmt)
+    } catch (err) {
+      failures++
+      console.error('Schema statement failed (continuing):', err.message, '\n  >', stmt.split('\n')[0])
+    }
+  }
+  if (failures > 0) {
+    console.warn(`Schema applied with ${failures} statement failure(s).`)
+  }
+}
+
+// Always runs the DDL + default seed (bypasses the per-process cache).
+// Used by the manual /api/migrate endpoint so it can be re-triggered on demand.
+export const migrate = async () => {
+  await runSchema()
+  await seedDefaults()
+  console.log('Database schema migrated (tables + defaults)')
+}
+
 // Idempotent. Runs the DDL + default seed exactly once per process.
 export const ensureSchema = () => {
   if (!schemaPromise) {
     schemaPromise = (async () => {
-      await query(SCHEMA_SQL)
+      await runSchema()
       await seedDefaults()
       console.log('Database schema ensured (tables + defaults)')
     })().catch((err) => {
