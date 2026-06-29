@@ -110,6 +110,10 @@ export default function AdminCompanyPage() {
             <div className="space-y-1"><Label>Bank Name</Label><Input value={form.bank_name || ''} onChange={e => handleChange('bank_name', e.target.value)} /></div>
             <div className="space-y-1"><Label>Account Name</Label><Input value={form.bank_account_name || ''} onChange={e => handleChange('bank_account_name', e.target.value)} /></div>
             <div className="space-y-1"><Label>Account Number</Label><Input value={form.bank_account_number || ''} onChange={e => handleChange('bank_account_number', e.target.value)} /></div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1"><Label>Merchant MoMo Name</Label><Input value={form.merchant_momo_name || ''} onChange={e => handleChange('merchant_momo_name', e.target.value)} /></div>
+              <div className="space-y-1"><Label>Merchant MoMo Number</Label><Input value={form.merchant_momo_number || ''} onChange={e => handleChange('merchant_momo_number', e.target.value)} /></div>
+            </div>
           </CardContent>
         </Card>
 

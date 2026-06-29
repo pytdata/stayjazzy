@@ -302,6 +302,8 @@ export interface PaymentRequest {
   percentage: number
   amount: number
   currency: string
+  payment_method: 'paystack' | 'cash' | 'bank_transfer' | 'momo_merchant'
+  offline_instructions: string | null
   status: 'pending' | 'paid' | 'overdue' | 'cancelled'
   due_date: string | null
   created_at: string
@@ -320,6 +322,8 @@ export interface Invoice {
   discount_amount: number
   total: number
   currency: string
+  payment_method: 'paystack' | 'cash' | 'bank_transfer' | 'momo_merchant'
+  payment_details: Record<string, unknown> | null
   status: 'draft' | 'sent' | 'paid' | 'cancelled'
   notes: string | null
   created_at: string
@@ -356,6 +360,8 @@ export interface CompanySettings {
   bank_name: string | null
   bank_account_name: string | null
   bank_account_number: string | null
+  merchant_momo_name: string | null
+  merchant_momo_number: string | null
   logo_url: string | null
   header_logo_height: number | null
   menu_logo_height: number | null

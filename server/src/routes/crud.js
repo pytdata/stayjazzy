@@ -31,10 +31,10 @@ const TABLE_COLUMNS = {
   chat_default_responses: ['id', 'question_pattern', 'response', 'sort_order', 'is_active', 'created_at', 'updated_at'],
   chat_settings: ['id', 'active_start', 'active_end', 'timezone', 'sms_enabled', 'alert_phone', 'alert_email', 'created_at', 'updated_at'],
   payment_transactions: ['id', 'booking_id', 'reference', 'amount', 'currency', 'status', 'gateway', 'gateway_response', 'paid_at', 'created_at'],
-  payment_requests: ['id', 'booking_id', 'stage_name', 'percentage', 'amount', 'currency', 'status', 'due_date', 'created_at', 'updated_at'],
-  invoices: ['id', 'invoice_number', 'booking_id', 'customer_name', 'customer_email', 'customer_phone', 'subtotal', 'tax_amount', 'discount_amount', 'total', 'currency', 'status', 'notes', 'created_at', 'updated_at'],
+  payment_requests: ['id', 'booking_id', 'stage_name', 'percentage', 'amount', 'currency', 'payment_method', 'offline_instructions', 'status', 'due_date', 'created_at', 'updated_at'],
+  invoices: ['id', 'invoice_number', 'booking_id', 'customer_name', 'customer_email', 'customer_phone', 'subtotal', 'tax_amount', 'discount_amount', 'total', 'currency', 'payment_method', 'payment_details', 'status', 'notes', 'created_at', 'updated_at'],
   receipts: ['id', 'receipt_number', 'transaction_id', 'invoice_id', 'customer_name', 'customer_email', 'amount', 'currency', 'payment_method', 'paid_at', 'created_at'],
-  company_settings: ['id', 'name', 'tagline', 'address', 'city', 'country', 'phone', 'email', 'website', 'registration_number', 'tax_number', 'bank_name', 'bank_account_name', 'bank_account_number', 'logo_url', 'header_logo_height', 'menu_logo_height', 'footer_logo_height', 'admin_logo_height', 'signature_urls', 'primary_color', 'secondary_color', 'created_at', 'updated_at'],
+  company_settings: ['id', 'name', 'tagline', 'address', 'city', 'country', 'phone', 'email', 'website', 'registration_number', 'tax_number', 'bank_name', 'bank_account_name', 'bank_account_number', 'merchant_momo_name', 'merchant_momo_number', 'logo_url', 'header_logo_height', 'menu_logo_height', 'footer_logo_height', 'admin_logo_height', 'signature_urls', 'primary_color', 'secondary_color', 'created_at', 'updated_at'],
   seo_settings: ['id', 'site_title', 'site_description', 'keywords', 'og_image_url', 'twitter_handle', 'google_analytics_id', 'facebook_pixel_id', 'robots_txt', 'sitemap_enabled', 'canonical_url', 'created_at', 'updated_at'],
 }
 

@@ -10,8 +10,17 @@ import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   getPaymentTransactions, getPaymentRequests, getInvoices, getReceipts,
+  updatePaymentRequest, updateInvoice, createReceipt,
 } from '@/db/api'
 import type { PaymentTransaction, PaymentRequest, Invoice, Receipt } from '@/types/types'
+import { toast } from 'sonner'
+
+const PAYMENT_METHOD_LABELS: Record<PaymentRequest['payment_method'], string> = {
+  paystack: 'Paystack',
+  cash: 'Cash',
+  bank_transfer: 'Bank',
+  momo_merchant: 'Merchant MoMo',
+}
 
 export default function AdminPaymentsPage() {
   const [activeTab, setActiveTab] = useState('transactions')
@@ -28,6 +37,52 @@ export default function AdminPaymentsPage() {
   }
 
   useEffect(() => { loadAll() }, [])
+
+  const findInvoiceForRequest = (request: PaymentRequest) =>
+    invoices.find(invoice =>
+      invoice.booking_id === request.booking_id &&
+      invoice.status !== 'paid' &&
+      Math.abs(Number(invoice.total) - Number(request.amount)) < 0.01 &&
+      (!invoice.notes || invoice.notes.includes(request.stage_name))
+    ) || invoices.find(invoice =>
+      invoice.booking_id === request.booking_id &&
+      invoice.status !== 'paid' &&
+      Math.abs(Number(invoice.total) - Number(request.amount)) < 0.01
+    )
+
+  const markRequestPaid = async (request: PaymentRequest) => {
+    try {
+      const invoice = findInvoiceForRequest(request)
+      await updatePaymentRequest(request.id, { status: 'paid' })
+      if (invoice) {
+        await updateInvoice(invoice.id, { status: 'paid' })
+        await createReceipt({
+          receipt_number: `RCP-${Date.now()}`,
+          invoice_id: invoice.id,
+          customer_name: invoice.customer_name,
+          customer_email: invoice.customer_email,
+          amount: Number(request.amount),
+          currency: request.currency,
+          payment_method: PAYMENT_METHOD_LABELS[request.payment_method] || request.payment_method,
+          paid_at: new Date().toISOString(),
+        })
+      }
+      toast.success('Payment request marked as paid')
+      await loadAll()
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to update payment status')
+    }
+  }
+
+  const cancelRequest = async (request: PaymentRequest) => {
+    try {
+      await updatePaymentRequest(request.id, { status: 'cancelled' })
+      toast.success('Payment request cancelled')
+      await loadAll()
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to cancel payment request')
+    }
+  }
 
   const totalRevenue = transactions.filter(t => t.status === 'success').reduce((s, t) => s + Number(t.amount), 0)
   const pendingAmount = requests.filter(r => r.status === 'pending').reduce((s, r) => s + Number(r.amount), 0)
@@ -114,16 +169,31 @@ export default function AdminPaymentsPage() {
           <Card>
             <CardContent className="overflow-x-auto pt-6">
               <table className="w-full text-sm">
-                <thead className="border-b"><tr className="text-left"><th>Booking</th><th>Stage</th><th>Percentage</th><th>Amount</th><th>Status</th><th>Due</th></tr></thead>
+                <thead className="border-b"><tr className="text-left"><th>Booking</th><th>Stage</th><th>Mode</th><th>Percentage</th><th>Amount</th><th>Status</th><th>Due</th><th>Actions</th></tr></thead>
                 <tbody className="divide-y">
                   {requests.map(r => (
                     <tr key={r.id}>
                       <td className="py-2">{r.booking_id.slice(0, 8)}...</td>
                       <td className="py-2">{r.stage_name}</td>
+                      <td className="py-2">{PAYMENT_METHOD_LABELS[r.payment_method] || r.payment_method}</td>
                       <td className="py-2">{r.percentage}%</td>
                       <td className="py-2 font-semibold">GHS {Number(r.amount).toLocaleString()}</td>
                       <td className="py-2"><Badge variant={r.status === 'paid' ? 'default' : r.status === 'pending' ? 'secondary' : 'destructive'}>{r.status}</Badge></td>
                       <td className="py-2 text-muted-foreground">{r.due_date ? new Date(r.due_date).toLocaleDateString() : '-'}</td>
+                      <td className="py-2">
+                        <div className="flex gap-2">
+                          {r.status !== 'paid' && (
+                            <Button size="sm" variant="outline" onClick={() => markRequestPaid(r)}>
+                              Mark Paid
+                            </Button>
+                          )}
+                          {r.status === 'pending' && (
+                            <Button size="sm" variant="ghost" className="text-destructive" onClick={() => cancelRequest(r)}>
+                              Cancel
+                            </Button>
+                          )}
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>

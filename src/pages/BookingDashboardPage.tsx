@@ -10,6 +10,7 @@ import {
   getBookingById,
   getBookingStages,
   getChatMessages,
+  getCompanySettings,
   getInvoicesByBooking,
   getPaymentRequestsByBooking,
   sendChatMessageObj as sendChatMessage,
@@ -20,10 +21,16 @@ import { useBooking } from '@/contexts/BookingContext'
 import PaystackButton from '@/components/payments/PaystackButton'
 import { toast } from 'sonner'
 import { Send, MessageCircle, CheckCircle, Clock, AlertCircle, Loader2, XCircle, CreditCard } from 'lucide-react'
-import type { Booking, BookingStageRecord as BookingStage, BookingChatMessage, SelectedService, PaymentRequest, Invoice } from '@/types/types'
+import type { Booking, BookingStageRecord as BookingStage, BookingChatMessage, SelectedService, PaymentRequest, Invoice, CompanySettings } from '@/types/types'
 import { format } from 'date-fns'
 
 const STAGES = ['Initial Payment', 'In Progress', 'Review', 'Final Stage', 'Completed'] as const
+const PAYMENT_METHOD_LABELS: Record<PaymentRequest['payment_method'], string> = {
+  paystack: 'Paystack Online',
+  cash: 'In-Person Cash',
+  bank_transfer: 'Bank Transfer',
+  momo_merchant: 'Merchant MoMo',
+}
 
 function StageIndicator({ stages, currentStage }: { stages: BookingStage[]; currentStage: string }) {
   const currentIdx = STAGES.indexOf(currentStage as typeof STAGES[number])
@@ -65,6 +72,7 @@ export default function BookingDashboardPage() {
   const [messages, setMessages] = useState<BookingChatMessage[]>([])
   const [paymentRequests, setPaymentRequests] = useState<PaymentRequest[]>([])
   const [invoices, setInvoices] = useState<Invoice[]>([])
+  const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null)
   const [newMsg, setNewMsg] = useState('')
   const [sending, setSending] = useState(false)
   const [cancelling, setCancelling] = useState(false)
@@ -82,18 +90,20 @@ export default function BookingDashboardPage() {
   const loadData = async () => {
     if (!id) return
     try {
-      const [bk, stgs, msgs, reqs, invs] = await Promise.all([
+      const [bk, stgs, msgs, reqs, invs, company] = await Promise.all([
         getBookingById(id),
         getBookingStages(id),
         getChatMessages(id),
         getPaymentRequestsByBooking(id),
         getInvoicesByBooking(id),
+        getCompanySettings(),
       ])
       setBooking(bk)
       setStages(stgs)
       setMessages(msgs)
       setPaymentRequests(reqs)
       setInvoices(invs)
+      setCompanySettings(company)
     } catch { /* silent */ }
     finally { setLoading(false) }
   }
@@ -149,6 +159,53 @@ export default function BookingDashboardPage() {
     if (invoice) await updateInvoice(invoice.id, { status: 'paid' })
     toast.success('Payment request marked as paid.')
     await loadData()
+  }
+
+  const getPaymentDetails = (invoice?: Invoice) =>
+    (invoice?.payment_details && typeof invoice.payment_details === 'object' ? invoice.payment_details : {}) as Record<string, string>
+
+  const renderOfflineDetails = (request: PaymentRequest, invoice?: Invoice) => {
+    const details = getPaymentDetails(invoice)
+    const bankName = details.bank_name || companySettings?.bank_name
+    const bankAccountName = details.bank_account_name || companySettings?.bank_account_name
+    const bankAccountNumber = details.bank_account_number || companySettings?.bank_account_number
+    const momoName = details.merchant_momo_name || companySettings?.merchant_momo_name
+    const momoNumber = details.merchant_momo_number || companySettings?.merchant_momo_number
+    const instructions = request.offline_instructions || details.offline_instructions
+
+    if (request.payment_method === 'bank_transfer') {
+      return (
+        <div className="mt-3 rounded-md bg-muted/60 p-3 text-sm space-y-1">
+          <p className="font-semibold">Bank payment details</p>
+          {bankName && <p>Bank: {bankName}</p>}
+          {bankAccountName && <p>Account name: {bankAccountName}</p>}
+          {bankAccountNumber && <p>Account number: {bankAccountNumber}</p>}
+          {instructions && <p className="text-muted-foreground">{instructions}</p>}
+        </div>
+      )
+    }
+
+    if (request.payment_method === 'momo_merchant') {
+      return (
+        <div className="mt-3 rounded-md bg-muted/60 p-3 text-sm space-y-1">
+          <p className="font-semibold">Merchant MoMo details</p>
+          {momoName && <p>Merchant name: {momoName}</p>}
+          {momoNumber && <p>Merchant number: {momoNumber}</p>}
+          {instructions && <p className="text-muted-foreground">{instructions}</p>}
+        </div>
+      )
+    }
+
+    if (request.payment_method === 'cash') {
+      return (
+        <div className="mt-3 rounded-md bg-muted/60 p-3 text-sm">
+          Pay in person at the Stay Jazzy Multimedia office or to an authorized team member.
+          {instructions && <p className="text-muted-foreground mt-1">{instructions}</p>}
+        </div>
+      )
+    }
+
+    return null
   }
 
   if (loading) return (
@@ -238,15 +295,18 @@ export default function BookingDashboardPage() {
                         <Badge variant={isPaid ? 'default' : 'secondary'}>{request.status}</Badge>
                       </div>
                       <p className="text-sm text-muted-foreground">
-                        {Number(request.percentage).toLocaleString()}% requested
+                        {Number(request.percentage).toLocaleString()}% requested · {PAYMENT_METHOD_LABELS[request.payment_method] || 'Payment'}
                         {request.due_date ? ` · Due ${format(new Date(request.due_date), 'PPP')}` : ''}
                       </p>
                       <p className="text-lg font-bold text-primary mt-1">GHS {Number(request.amount).toLocaleString()}</p>
+                      {request.payment_method !== 'paystack' && renderOfflineDetails(request, invoice)}
                     </div>
                     {isPaid ? (
                       <div className="inline-flex items-center text-sm font-semibold text-green-700">
                         <CheckCircle className="h-4 w-4 mr-1.5" /> Paid
                       </div>
+                    ) : request.payment_method !== 'paystack' ? (
+                      <Badge variant="outline" className="shrink-0">Awaiting admin confirmation</Badge>
                     ) : (
                       <PaystackButton
                         email={booking.user_email}

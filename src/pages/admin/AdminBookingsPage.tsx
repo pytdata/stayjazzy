@@ -8,13 +8,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog'
-import { getAllBookings, getBookingStages, getChatMessages, sendChatMessageObj as sendChatMessage, updateBookingStage, createBookingStage, createPaymentRequest, createInvoice } from '@/db/api'
-import type { Booking, BookingChatMessage, BookingStageRecord as BookingStage } from '@/types/types'
+import { getAllBookings, getBookingStages, getChatMessages, sendChatMessageObj as sendChatMessage, updateBookingStage, createBookingStage, createPaymentRequest, createInvoice, getCompanySettings } from '@/db/api'
+import type { Booking, BookingChatMessage, BookingStageRecord as BookingStage, CompanySettings, PaymentRequest } from '@/types/types'
 import { toast } from 'sonner'
 import { MessageCircle, Send, ChevronDown, ChevronUp, Loader2, CreditCard } from 'lucide-react'
 import { format } from 'date-fns'
 
 const STAGE_OPTIONS = ['Initial Payment', 'In Progress', 'Review', 'Final Stage', 'Completed']
+const PAYMENT_METHOD_OPTIONS: Array<{ value: PaymentRequest['payment_method']; label: string }> = [
+  { value: 'paystack', label: 'Paystack (Online)' },
+  { value: 'cash', label: 'In-Person Cash' },
+  { value: 'bank_transfer', label: 'Bank Transfer' },
+  { value: 'momo_merchant', label: 'Merchant MoMo' },
+]
 const STATUS_COLORS: Record<string, string> = {
   active: 'bg-blue-100 text-blue-700', completed: 'bg-green-100 text-green-700', cancelled: 'bg-red-100 text-red-700', pending: 'bg-yellow-100 text-yellow-700'
 }
@@ -28,6 +34,9 @@ function PaymentRequestDialog({
   const [percentage, setPercentage] = useState('')
   const [stageName, setStageName] = useState('')
   const [extraCost, setExtraCost] = useState('')
+  const [paymentMethod, setPaymentMethod] = useState<PaymentRequest['payment_method']>('paystack')
+  const [offlineInstructions, setOfflineInstructions] = useState('')
+  const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null)
   const [loading, setLoading] = useState(false)
 
   const baseAmount = (booking.selected_services || []).reduce((sum, service) => sum + Number(service.price || 0), 0)
@@ -43,6 +52,9 @@ function PaymentRequestDialog({
     setPercentage('')
     setStageName('')
     setExtraCost('')
+    setPaymentMethod('paystack')
+    setOfflineInstructions('')
+    getCompanySettings().then(setCompanySettings).catch(() => setCompanySettings(null))
   }, [open, booking.id])
 
   const handleSubmit = async () => {
@@ -64,9 +76,26 @@ function PaymentRequestDialog({
       toast.error('This booking has no project value yet')
       return
     }
+    if (paymentMethod === 'bank_transfer' && !companySettings?.bank_account_number) {
+      toast.error('Add bank details in Company Settings before requesting bank payment')
+      return
+    }
+    if (paymentMethod === 'momo_merchant' && !companySettings?.merchant_momo_number) {
+      toast.error('Add Merchant MoMo details in Company Settings before requesting MoMo payment')
+      return
+    }
     setLoading(true)
     try {
       const amount = Number(computedAmount)
+      const paymentDetails = {
+        method: paymentMethod,
+        bank_name: companySettings?.bank_name || '',
+        bank_account_name: companySettings?.bank_account_name || '',
+        bank_account_number: companySettings?.bank_account_number || '',
+        merchant_momo_name: companySettings?.merchant_momo_name || '',
+        merchant_momo_number: companySettings?.merchant_momo_number || '',
+        offline_instructions: offlineInstructions.trim(),
+      }
       // 1. Create payment request record
       await createPaymentRequest({
         booking_id: booking.id,
@@ -74,6 +103,8 @@ function PaymentRequestDialog({
         percentage: Number(percentage),
         amount,
         currency: 'GHS',
+        payment_method: paymentMethod,
+        offline_instructions: offlineInstructions.trim() || null,
         status: 'pending',
       })
 
@@ -88,8 +119,10 @@ function PaymentRequestDialog({
         discount_amount: 0,
         total: amount,
         currency: 'GHS',
+        payment_method: paymentMethod,
+        payment_details: paymentDetails,
         status: 'sent',
-        notes: `Payment request for stage: ${stageName} (${percentage}% of GHS ${totalAmount.toFixed(2)}; base: GHS ${baseAmount.toFixed(2)}, extra costs: GHS ${extras.toFixed(2)})`,
+        notes: `Payment request for stage: ${stageName} (${percentage}% of GHS ${totalAmount.toFixed(2)}; base: GHS ${baseAmount.toFixed(2)}, extra costs: GHS ${extras.toFixed(2)}; method: ${paymentMethod})`,
       })
 
       toast.success(`Payment request of GHS ${amount.toLocaleString()} sent to client`)
@@ -158,10 +191,29 @@ function PaymentRequestDialog({
               onChange={e => setPercentage(e.target.value)}
             />
           </div>
+          <div className="space-y-1">
+            <Label>Payment Mode</Label>
+            <Select value={paymentMethod} onValueChange={value => setPaymentMethod(value as PaymentRequest['payment_method'])}>
+              <SelectTrigger><SelectValue placeholder="Select payment mode" /></SelectTrigger>
+              <SelectContent>
+                {PAYMENT_METHOD_OPTIONS.map(option => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          {paymentMethod !== 'paystack' && (
+            <div className="space-y-1">
+              <Label>Offline Payment Instructions</Label>
+              <Input
+                placeholder="e.g. Include booking reference in payment narration"
+                value={offlineInstructions}
+                onChange={e => setOfflineInstructions(e.target.value)}
+              />
+            </div>
+          )}
           {computedAmount && (
             <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 text-sm">
               <p className="font-semibold text-primary">Amount to charge: GHS {Number(computedAmount).toLocaleString()}</p>
-              <p className="text-muted-foreground text-xs mt-0.5">An invoice will be generated automatically.</p>
+              <p className="text-muted-foreground text-xs mt-0.5">An invoice will be generated automatically with the selected payment details.</p>
             </div>
           )}
         </div>

@@ -303,11 +303,15 @@ CREATE TABLE IF NOT EXISTS payment_requests (
   percentage NUMERIC DEFAULT 0,
   amount NUMERIC DEFAULT 0,
   currency TEXT DEFAULT 'GHS',
+  payment_method TEXT DEFAULT 'paystack',
+  offline_instructions TEXT,
   status TEXT DEFAULT 'pending',
   due_date TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+ALTER TABLE payment_requests ADD COLUMN IF NOT EXISTS payment_method TEXT DEFAULT 'paystack';
+ALTER TABLE payment_requests ADD COLUMN IF NOT EXISTS offline_instructions TEXT;
 
 CREATE TABLE IF NOT EXISTS invoices (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -321,11 +325,15 @@ CREATE TABLE IF NOT EXISTS invoices (
   discount_amount NUMERIC DEFAULT 0,
   total NUMERIC DEFAULT 0,
   currency TEXT DEFAULT 'GHS',
+  payment_method TEXT DEFAULT 'paystack',
+  payment_details JSONB DEFAULT '{}'::jsonb,
   status TEXT DEFAULT 'draft',
   notes TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS payment_method TEXT DEFAULT 'paystack';
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS payment_details JSONB DEFAULT '{}'::jsonb;
 
 CREATE TABLE IF NOT EXISTS receipts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -357,6 +365,8 @@ CREATE TABLE IF NOT EXISTS company_settings (
   bank_name TEXT,
   bank_account_name TEXT,
   bank_account_number TEXT,
+  merchant_momo_name TEXT,
+  merchant_momo_number TEXT,
   logo_url TEXT,
   header_logo_height INTEGER DEFAULT 48,
   menu_logo_height INTEGER DEFAULT 48,
@@ -372,6 +382,8 @@ ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS header_logo_height INTEGER
 ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS menu_logo_height INTEGER DEFAULT 48;
 ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS footer_logo_height INTEGER DEFAULT 48;
 ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS admin_logo_height INTEGER DEFAULT 40;
+ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS merchant_momo_name TEXT;
+ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS merchant_momo_number TEXT;
 
 CREATE TABLE IF NOT EXISTS seo_settings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
