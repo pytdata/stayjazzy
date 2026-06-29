@@ -304,7 +304,8 @@ async function postEmail(path: string, payload: Record<string, unknown>) {
   })
   const body = await response.json().catch(() => ({}))
   if (!response.ok) {
-    throw new Error((body as { error?: string }).error || 'Email could not be sent')
+    const details = body as { error?: string; hint?: string }
+    throw new Error([details.error, details.hint].filter(Boolean).join(' ') || 'Email could not be sent')
   }
   return body
 }

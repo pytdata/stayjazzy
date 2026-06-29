@@ -2,6 +2,12 @@ import nodemailer from 'nodemailer';
 
 const BRAND_NAME = 'Stay Jazzy Multimedia';
 const DEFAULT_FROM_NAME = process.env.EMAIL_FROM_NAME || 'Stay Jazzy';
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
+
+function parseBoolean(value) {
+  if (value === undefined || value === null || value === '') return null;
+  return ['1', 'true', 'yes', 'on'].includes(String(value).trim().toLowerCase());
+}
 
 function getSmtpConfig() {
   const host = process.env.SMTP_HOST;
@@ -9,7 +15,8 @@ function getSmtpConfig() {
   const port = Number.parseInt(portValue, 10);
   const user = process.env.SMTP_USER;
   const pass = process.env.SMTP_PASS;
-  const secure = process.env.SMTP_SECURE === 'true';
+  const explicitSecure = parseBoolean(process.env.SMTP_SECURE);
+  const secure = explicitSecure ?? port === 465;
   const fromEmail = process.env.EMAIL_FROM || user;
 
   const missing = [];
@@ -17,6 +24,7 @@ function getSmtpConfig() {
   if (!user) missing.push('SMTP_USER');
   if (!pass) missing.push('SMTP_PASS');
   if (!fromEmail) missing.push('EMAIL_FROM or SMTP_USER');
+  if (fromEmail && !fromEmail.includes('<') && !EMAIL_RE.test(fromEmail)) missing.push('EMAIL_FROM must be an email address');
   if (!Number.isInteger(port) || port <= 0) missing.push('SMTP_PORT');
 
   return { host, port, secure, user, pass, fromEmail, missing };
@@ -39,11 +47,59 @@ function createTransporter() {
     host: config.host,
     port: config.port,
     secure: config.secure,
+    requireTLS: !config.secure,
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 20000,
     auth: {
       user: config.user,
       pass: config.pass,
     },
   });
+}
+
+function getFromAddress(config) {
+  if (config.fromEmail.includes('<')) return config.fromEmail;
+  return `"${DEFAULT_FROM_NAME}" <${config.fromEmail}>`;
+}
+
+export function getEmailDiagnostics() {
+  const config = getSmtpConfig();
+  return {
+    configured: config.missing.length === 0,
+    missing: config.missing,
+    host: config.host || null,
+    port: Number.isInteger(config.port) ? config.port : null,
+    secure: config.secure,
+    fromConfigured: Boolean(config.fromEmail),
+    fromLooksValid: Boolean(config.fromEmail && (config.fromEmail.includes('<') || EMAIL_RE.test(config.fromEmail))),
+  };
+}
+
+export function describeEmailError(error) {
+  const code = error?.code || 'EMAIL_DELIVERY_FAILED';
+  const responseCode = error?.responseCode;
+  const command = error?.command;
+  const response = String(error?.response || error?.message || '').slice(0, 300);
+  let hint = 'The SMTP server rejected or did not complete the delivery request.';
+
+  if (code === 'EAUTH' || responseCode === 535) {
+    hint = 'SMTP authentication failed. Check SMTP_USER and SMTP_PASS. Gmail requires an App Password, not the normal account password.';
+  } else if (['ECONNECTION', 'ETIMEDOUT', 'ESOCKET'].includes(code)) {
+    hint = 'Could not connect to the SMTP server. Check SMTP_HOST, SMTP_PORT, SMTP_SECURE, and whether the provider allows SMTP from Vercel.';
+  } else if (responseCode === 550 || responseCode === 553) {
+    hint = 'The sender or recipient was rejected. Check EMAIL_FROM and whether the sender is verified with your SMTP provider.';
+  } else if (responseCode === 534) {
+    hint = 'The provider requires additional authentication setup, such as enabling SMTP access or using an app-specific password.';
+  }
+
+  return { code, responseCode, command, response, hint };
+}
+
+export async function verifyEmailConnection() {
+  const transporter = createTransporter();
+  await transporter.verify();
+  return true;
 }
 
 function escapeHtml(value = '') {
@@ -182,7 +238,7 @@ export async function sendEmail({ to, subject, text, html, replyTo }) {
   const config = assertEmailConfigured();
   const transporter = createTransporter();
   return transporter.sendMail({
-    from: `"${DEFAULT_FROM_NAME}" <${config.fromEmail}>`,
+    from: getFromAddress(config),
     to,
     subject,
     text,
@@ -190,4 +246,3 @@ export async function sendEmail({ to, subject, text, html, replyTo }) {
     replyTo,
   });
 }
-

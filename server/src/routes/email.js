@@ -8,7 +8,10 @@ import {
   assertEmailConfigured,
   buildBookingConfirmationEmail,
   buildOtpEmail,
+  describeEmailError,
+  getEmailDiagnostics,
   sendEmail as sendSmtpEmail,
+  verifyEmailConnection,
 } from '../emailService.js';
 
 export const emailRouter = express.Router();
@@ -154,22 +157,50 @@ const handleEmailError = (error, res) => {
     return res.status(400).json({ error: 'Missing required email fields' });
   }
 
-  console.error('Email send error:', error?.message || 'Unknown error');
-  return res.status(502).json({ error: 'Email could not be delivered. Please try again shortly.' });
+  const details = describeEmailError(error);
+  console.error('Email send error:', {
+    code: details.code,
+    responseCode: details.responseCode,
+    command: details.command,
+    hint: details.hint,
+  });
+  return res.status(502).json({
+    error: 'Email could not be delivered. Please try again shortly.',
+    code: details.code,
+    responseCode: details.responseCode,
+    hint: details.hint,
+  });
 };
 
 const deliverEmail = ({ to, subject, html, text, replyTo }) =>
   sendSmtpEmail({ to, subject, html, text, replyTo });
 
-emailRouter.get('/status', (_req, res) => {
+emailRouter.get('/status', async (req, res) => {
   try {
     assertEmailConfigured();
-    res.json({ configured: true });
+    const diagnostics = getEmailDiagnostics();
+    if (req.query.verify === 'true') {
+      await verifyEmailConnection();
+      return res.json({ ...diagnostics, smtpVerified: true });
+    }
+    res.json(diagnostics);
   } catch (error) {
-    res.status(503).json({
-      configured: false,
-      error: 'Email service is not configured.',
-      missing: error?.missing || [],
+    if (error?.code === 'EMAIL_NOT_CONFIGURED') {
+      return res.status(503).json({
+        ...getEmailDiagnostics(),
+        error: 'Email service is not configured.',
+        missing: error?.missing || [],
+      });
+    }
+
+    const details = describeEmailError(error);
+    res.status(502).json({
+      ...getEmailDiagnostics(),
+      smtpVerified: false,
+      error: 'SMTP verification failed.',
+      code: details.code,
+      responseCode: details.responseCode,
+      hint: details.hint,
     });
   }
 });
