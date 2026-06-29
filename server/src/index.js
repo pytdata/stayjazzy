@@ -19,6 +19,8 @@ const configuredOrigins = (process.env.ALLOWED_ORIGIN || '')
 const allowedOrigins = [
   'https://stayjazzy.vercel.app',
   'https://stayjazzy-backend.vercel.app',
+  'https://stajazzymultimedia.com',
+  'https://www.stajazzymultimedia.com',
   'http://localhost:5173',
   'http://localhost:5174',
   'http://localhost:4000',
