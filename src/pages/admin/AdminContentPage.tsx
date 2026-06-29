@@ -20,6 +20,7 @@ import {
 } from '@/db/api'
 import type { HeroSlide, TeamMember, PortfolioWork, FAQ } from '@/types/types'
 import { toast } from 'sonner'
+import { getImageUrl } from '@/lib/mediaUrls'
 
 function SlideManager() {
   const [slides, setSlides] = useState<Partial<HeroSlide>[]>([])
@@ -57,7 +58,7 @@ function SlideManager() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {slides.map(s => (
           <div key={s.id} className="border border-border rounded-xl overflow-hidden flex flex-col">
-            <div className="aspect-video"><img src={s.image_url ?? undefined} alt={s.title ?? undefined} className="w-full h-full object-cover" /></div>
+            <div className="aspect-video"><img src={getImageUrl(s.image_url)} alt={s.title ?? undefined} className="w-full h-full object-cover" /></div>
             <div className="p-3 flex items-center justify-between gap-2">
               <div className="min-w-0"><p className="font-medium text-sm truncate">{s.title || 'Untitled'}</p></div>
               <Button size="sm" variant="outline" onClick={() => s.id && remove(s.id)} className="text-destructive border-destructive/30 shrink-0"><Trash2 className="h-3.5 w-3.5" /></Button>
@@ -142,7 +143,7 @@ function TeamManager() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {team.map(m => (
           <div key={m.id} className="border border-border rounded-xl p-3 flex items-start gap-3">
-            {m.image_url ? <img src={m.image_url} alt={m.name} className="w-12 h-12 rounded-full object-cover shrink-0" /> : <div className="w-12 h-12 bg-muted rounded-full shrink-0 flex items-center justify-center font-bold text-muted-foreground">{(m.name || '?')[0]}</div>}
+            {m.image_url ? <img src={getImageUrl(m.image_url)} alt={m.name} className="w-12 h-12 rounded-full object-cover shrink-0" /> : <div className="w-12 h-12 bg-muted rounded-full shrink-0 flex items-center justify-center font-bold text-muted-foreground">{(m.name || '?')[0]}</div>}
             <div className="flex-1 min-w-0">
               <p className="font-semibold text-sm">{m.name}</p>
               <p className="text-xs text-primary">{m.role}</p>
@@ -285,7 +286,7 @@ function WorksManager() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
         {works.map(w => (
           <div key={w.id} className="border border-border rounded-xl overflow-hidden">
-            {w.image_url && <div className="aspect-video"><img src={w.image_url} alt={w.title} className="w-full h-full object-cover" /></div>}
+            {w.image_url && <div className="aspect-video"><img src={getImageUrl(w.image_url)} alt={w.title} className="w-full h-full object-cover" /></div>}
             <div className="p-3 flex items-center justify-between gap-2">
               <div className="min-w-0">
                 <p className="font-medium text-sm truncate">{w.title}</p>

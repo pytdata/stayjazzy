@@ -1,5 +1,4 @@
-import newLogo from "@/assets/new-logo.png";
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Calendar, Settings, Image, MessageSquare, Star,
@@ -8,6 +7,10 @@ import {
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/contexts/AuthContext'
 import { cn } from '@/lib/utils'
+import { getCompanySettings } from '@/db/api'
+import { getImageUrl } from '@/lib/mediaUrls'
+
+const DEFAULT_LOGO = 'https://miaoda-conversation-file.s3cdn.medo.dev/user-bo1v51m4ml1c/app-bu4kziuqa9dt/20260523/logo.jpeg'
 
 const NAV_ITEMS = [
   { label: 'Overview', path: '/admin', icon: LayoutDashboard, end: true },
@@ -28,6 +31,13 @@ const NAV_ITEMS = [
 function SidebarContent({ onClose }: { onClose?: () => void }) {
   const { admin, signOut } = useAuth()
   const navigate = useNavigate()
+  const [logoUrl, setLogoUrl] = useState(DEFAULT_LOGO)
+
+  useEffect(() => {
+    getCompanySettings().then(settings => {
+      if (settings?.logo_url) setLogoUrl(settings.logo_url)
+    })
+  }, [])
 
   const handleSignOut = () => {
     signOut()
@@ -39,7 +49,7 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
     <div className="flex flex-col h-full bg-sidebar text-sidebar-foreground">
       <div className="px-5 py-5 border-b border-sidebar-border">
         <img
-          src="https://miaoda-conversation-file.s3cdn.medo.dev/user-bo1v51m4ml1c/app-bu4kziuqa9dt/20260523/logo.jpeg"
+          src={getImageUrl(logoUrl)}
           alt="Stay Jazzy"
           className="h-10 w-auto object-contain brightness-0 invert mb-2"
         />

@@ -9,6 +9,7 @@ import { getCompanySettings, updateCompanySettings } from '@/db/api'
 import type { CompanySettings } from '@/types/types'
 import { toast } from 'sonner'
 import MediaUpload from '@/components/ui/MediaUpload'
+import { getImageUrl } from '@/lib/mediaUrls'
 
 export default function AdminCompanyPage() {
   const [settings, setSettings] = useState<CompanySettings | null>(null)
@@ -100,7 +101,7 @@ export default function AdminCompanyPage() {
             <div className="flex flex-wrap gap-2">
               {(form.signature_urls || []).map((url, i) => (
                 <div key={i} className="relative border rounded-lg p-2">
-                  <img src={url} alt={`Signature ${i + 1}`} className="h-16 w-auto object-contain" />
+                  <img src={getImageUrl(url)} alt={`Signature ${i + 1}`} className="h-16 w-auto object-contain" />
                   <button
                     type="button"
                     onClick={() => handleChange('signature_urls', (form.signature_urls || []).filter((_, j) => j !== i))}

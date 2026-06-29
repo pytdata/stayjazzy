@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { getClientLogos } from '@/db/api'
 import type { ClientLogo } from '@/types/types'
+import { getImageUrl } from '@/lib/mediaUrls'
 
 // Fallback logos when no DB data
 
@@ -21,13 +22,13 @@ function LogoItem({ logo }: { logo: Partial<ClientLogo> }) {
       {logo.colored_logo_url || logo.bw_logo_url ? (
         <div className="relative w-24 h-16">
           <img
-            src={logo.bw_logo_url ?? logo.colored_logo_url ?? undefined}
+            src={getImageUrl(logo.bw_logo_url ?? logo.colored_logo_url)}
             alt={logo.client_name}
             className={`absolute inset-0 w-full h-full object-contain transition-opacity duration-600 ${inView ? 'opacity-0' : 'opacity-100'}`}
             style={{ filter: 'grayscale(100%)' }}
           />
           <img
-            src={logo.colored_logo_url ?? logo.bw_logo_url ?? undefined}
+            src={getImageUrl(logo.colored_logo_url ?? logo.bw_logo_url)}
             alt={logo.client_name}
             className={`absolute inset-0 w-full h-full object-contain transition-opacity duration-600 ${inView ? 'opacity-100' : 'opacity-0'}`}
           />

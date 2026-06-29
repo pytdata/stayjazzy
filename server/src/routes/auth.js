@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { query } from '../db.js';
 import nodemailer from 'nodemailer';
+import { ensureSchema } from '../schema.js';
 
 export const authRouter = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_jwt_key_stayjazzy';
@@ -10,6 +11,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_jwt_key_stayjazzy';
 authRouter.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
+    await ensureSchema();
     const result = await query('SELECT * FROM admins WHERE email = $1', [email]);
     const admin = result.rows[0];
 
@@ -22,9 +24,9 @@ authRouter.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    const token = jwt.sign({ id: admin.id, email: admin.email }, JWT_SECRET, { expiresIn: '24h' });
+    const token = jwt.sign({ sub: admin.id, id: admin.id, email: admin.email, role: admin.role }, JWT_SECRET, { expiresIn: '24h' });
     
-    res.json({ user: { id: admin.id, email: admin.email }, token });
+    res.json({ user: { id: admin.id, email: admin.email, role: admin.role }, token });
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ error: 'Server error' });

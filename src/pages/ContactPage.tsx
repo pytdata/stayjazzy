@@ -6,15 +6,30 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { submitContactMessage, trackPageView } from '@/db/api'
+import { getCompanySettings, submitContactMessage, trackPageView } from '@/db/api'
 import { toast } from 'sonner'
 
 export default function ContactPage() {
   const [form, setForm] = useState({ name: '', email: '', phone: '', subject: '', message: '' })
   const [loading, setLoading] = useState(false)
   const [sent, setSent] = useState(false)
+  const [company, setCompany] = useState({
+    address: 'Accra, Ghana',
+    phone: '+233 000 000 000',
+    email: 'info@stayjazzy.com',
+  })
 
-  useEffect(() => { trackPageView('/contact') }, [])
+  useEffect(() => {
+    trackPageView('/contact')
+    getCompanySettings().then(settings => {
+      if (!settings) return
+      setCompany(prev => ({
+        address: settings.address || [settings.city, settings.country].filter(Boolean).join(', ') || prev.address,
+        phone: settings.phone || prev.phone,
+        email: settings.email || prev.email,
+      }))
+    })
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -88,9 +103,9 @@ export default function ContactPage() {
         <div className="space-y-6">
           <h2 className="text-2xl font-bold">Get In Touch</h2>
           {[
-            { icon: MapPin, title: 'Address', content: 'Accra, Ghana' },
-            { icon: Phone, title: 'Phone', content: '+233 000 000 000' },
-            { icon: Mail, title: 'Email', content: 'info@stayjazzy.com' },
+            { icon: MapPin, title: 'Address', content: company.address },
+            { icon: Phone, title: 'Phone', content: company.phone },
+            { icon: Mail, title: 'Email', content: company.email },
             { icon: Clock, title: 'Business Hours', content: 'Mon – Sat: 8:00 AM – 6:00 PM' },
           ].map(({ icon: Icon, title, content }) => (
             <Card key={title} className="border-border">

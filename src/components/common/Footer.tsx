@@ -1,11 +1,13 @@
-import newLogo from "@/assets/new-logo.png";
 import { Link } from 'react-router-dom'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Mail, Phone, MapPin, Send } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { subscribeNewsletter } from '@/db/api'
+import { getCompanySettings, subscribeNewsletter } from '@/db/api'
 import { toast } from 'sonner'
+import { getImageUrl } from '@/lib/mediaUrls'
+
+const DEFAULT_LOGO = 'https://miaoda-conversation-file.s3cdn.medo.dev/user-bo1v51m4ml1c/app-bu4kziuqa9dt/20260523/logo.jpeg'
 
 const PAGE_LINKS = [
   { label: 'Home', path: '/' },
@@ -20,6 +22,24 @@ const PAGE_LINKS = [
 export default function Footer() {
   const [email, setEmail] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [company, setCompany] = useState({
+    logo_url: DEFAULT_LOGO,
+    address: 'Accra, Ghana',
+    phone: '+233 000 000 000',
+    email: 'info@stayjazzy.com',
+  })
+
+  useEffect(() => {
+    getCompanySettings().then(settings => {
+      if (!settings) return
+      setCompany(prev => ({
+        logo_url: settings.logo_url || prev.logo_url,
+        address: settings.address || [settings.city, settings.country].filter(Boolean).join(', ') || prev.address,
+        phone: settings.phone || prev.phone,
+        email: settings.email || prev.email,
+      }))
+    })
+  }, [])
 
   const handleNewsletter = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -49,7 +69,7 @@ export default function Footer() {
         {/* Column 1: Logo + description */}
         <div>
           <img
-            src="https://miaoda-conversation-file.s3cdn.medo.dev/user-bo1v51m4ml1c/app-bu4kziuqa9dt/20260523/logo.jpeg"
+            src={getImageUrl(company.logo_url)}
             alt="Stay Jazzy Multimedia"
             className="h-12 w-auto object-contain mb-4 brightness-0 invert"
           />
@@ -89,15 +109,15 @@ export default function Footer() {
           <ul className="space-y-3">
             <li className="flex items-start gap-2 text-sm text-white/70">
               <MapPin className="h-4 w-4 shrink-0 mt-0.5 text-[#f7b808]" />
-              <span>Accra, Ghana</span>
+              <span>{company.address}</span>
             </li>
             <li className="flex items-center gap-2 text-sm text-white/70">
               <Phone className="h-4 w-4 shrink-0 text-[#f7b808]" />
-              <a href="tel:+233000000000" className="hover:text-white transition-colors">+233 000 000 000</a>
+              <a href={`tel:${company.phone.replace(/\s/g, '')}`} className="hover:text-white transition-colors">{company.phone}</a>
             </li>
             <li className="flex items-center gap-2 text-sm text-white/70">
               <Mail className="h-4 w-4 shrink-0 text-[#f7b808]" />
-              <a href="mailto:info@stayjazzy.com" className="hover:text-white transition-colors">info@stayjazzy.com</a>
+              <a href={`mailto:${company.email}`} className="hover:text-white transition-colors">{company.email}</a>
             </li>
           </ul>
         </div>

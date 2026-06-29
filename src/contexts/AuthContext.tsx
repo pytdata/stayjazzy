@@ -47,7 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false)
       return
     }
-    setAdmin({ id: payload.sub, email: payload.email, role: payload.role })
+    setAdmin({ id: payload.sub || payload.id, email: payload.email, role: payload.role || 'admin' })
     setLoading(false)
   }, [])
 
@@ -66,7 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       const data = await res.json()
       sessionStorage.setItem(ADMIN_KEY, data.token)
-      setAdmin({ id: data.user.id, email: data.user.email, role: 'admin' })
+      setAdmin({ id: data.user.id, email: data.user.email, role: data.user.role || 'admin' })
       return { error: null }
     } catch (e) {
       return { error: 'Network error' }

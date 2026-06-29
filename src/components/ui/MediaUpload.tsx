@@ -3,6 +3,7 @@ import { Input } from './input'
 import { Label } from './label'
 import { Button } from './button'
 import { Link, X } from 'lucide-react'
+import { getGoogleDrivePreviewUrl, getImageUrl, getVideoUrl, isEmbeddableVideoUrl, isGoogleDriveUrl } from '@/lib/mediaUrls'
 
 interface MediaUploadProps {
   label?: string
@@ -14,9 +15,11 @@ interface MediaUploadProps {
 export default function MediaUpload({ label, value, onChange, accept = 'image' }: MediaUploadProps) {
   const [inputValue, setInputValue] = useState(value || '')
 
-  // Render a simple preview if valid URL
-  const isYoutube = value?.includes('youtube.com') || value?.includes('youtu.be')
-  const isDrive = value?.includes('drive.google.com')
+  const previewValue = value || ''
+  const isDrive = isGoogleDriveUrl(previewValue)
+  const imagePreviewUrl = getImageUrl(previewValue)
+  const videoPreviewUrl = getVideoUrl(previewValue)
+  const shouldEmbedVideo = accept === 'video' && isEmbeddableVideoUrl(previewValue)
 
   return (
     <div className="space-y-4">
@@ -45,28 +48,37 @@ export default function MediaUpload({ label, value, onChange, accept = 'image' }
             <X className="h-3 w-3" />
           </Button>
           
-          {isYoutube ? (
+          {accept === 'image' ? (
+            <div className="aspect-video w-full flex items-center justify-center bg-muted overflow-hidden">
+              <img
+                src={imagePreviewUrl}
+                alt="Preview"
+                className="w-full h-full object-contain"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none'
+                }}
+              />
+            </div>
+          ) : shouldEmbedVideo ? (
              <div className="aspect-video w-full">
                <iframe 
                  className="w-full h-full"
-                 src={value.replace('watch?v=', 'embed/').replace('youtu.be/', 'youtube.com/embed/')} 
+                 src={videoPreviewUrl}
                  allowFullScreen 
                />
              </div>
           ) : isDrive ? (
              <div className="aspect-video w-full bg-muted flex items-center justify-center text-sm text-muted-foreground p-4 text-center">
-                Google Drive Link:<br/>
-                <a href={value} target="_blank" rel="noreferrer" className="text-primary hover:underline break-all">{value}</a>
+                <iframe className="w-full h-full" src={getGoogleDrivePreviewUrl(value)} allow="autoplay" />
              </div>
           ) : (
             <div className="aspect-video w-full flex items-center justify-center bg-muted overflow-hidden">
-              {accept === 'image' ? (
-                <img src={value} alt="Preview" className="w-full h-full object-cover" onError={(e) => (e.currentTarget.style.display = 'none')} />
-              ) : (
-                <video src={value} className="w-full h-full object-cover" controls />
-              )}
+              <video src={previewValue} className="w-full h-full object-cover" controls />
             </div>
           )}
+          <a href={value} target="_blank" rel="noreferrer" className="mt-2 block text-xs text-primary hover:underline break-all">
+            {value}
+          </a>
         </div>
       )}
     </div>

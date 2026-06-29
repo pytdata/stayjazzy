@@ -9,6 +9,7 @@ import type { ClientLogo } from '@/types/types'
 import { toast } from 'sonner'
 import { Plus, Trash2, Loader2 } from 'lucide-react'
 import MediaUpload from '@/components/ui/MediaUpload'
+import { getImageUrl } from '@/lib/mediaUrls'
 
 export default function AdminLogosPage() {
   const [logos, setLogos] = useState<ClientLogo[]>([])
@@ -57,7 +58,7 @@ export default function AdminLogosPage() {
                 <CardContent className="p-4 flex flex-col items-center gap-3">
                   <div className="w-full aspect-[3/2] bg-muted rounded-lg overflow-hidden flex items-center justify-center">
                     {logo.colored_logo_url
-                      ? <img src={logo.colored_logo_url} alt={logo.client_name} className="w-full h-full object-contain p-2" />
+                      ? <img src={getImageUrl(logo.colored_logo_url)} alt={logo.client_name} className="w-full h-full object-contain p-2" />
                       : <span className="text-sm font-medium text-muted-foreground text-center px-2">{logo.client_name}</span>
                     }
                   </div>

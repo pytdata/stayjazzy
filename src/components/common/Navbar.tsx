@@ -1,4 +1,3 @@
-import newLogo from "@/assets/new-logo.png";
 import { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { Menu, X, ShoppingBag } from 'lucide-react'
@@ -7,6 +6,10 @@ import { useBooking } from '@/contexts/BookingContext'
 import { useLanguage } from '@/contexts/LanguageContext'
 import LanguageSwitcher from './LanguageSwitcher'
 import { cn } from '@/lib/utils'
+import { getCompanySettings } from '@/db/api'
+import { getImageUrl } from '@/lib/mediaUrls'
+
+const DEFAULT_LOGO = 'https://miaoda-conversation-file.s3cdn.medo.dev/user-bo1v51m4ml1c/app-bu4kziuqa9dt/20260523/logo.jpeg'
 
 const NAV_KEYS = [
   { key: 'home', path: '/' },
@@ -24,6 +27,7 @@ export default function Navbar() {
   const { selectedServices } = useBooking()
   const { t } = useLanguage()
   const isHome = location.pathname === '/'
+  const [logoUrl, setLogoUrl] = useState(DEFAULT_LOGO)
 
   useEffect(() => {
     const handler = () => setScrolled(window.scrollY > 60)
@@ -32,6 +36,12 @@ export default function Navbar() {
   }, [])
 
   useEffect(() => { setMobileOpen(false) }, [location])
+
+  useEffect(() => {
+    getCompanySettings().then(settings => {
+      if (settings?.logo_url) setLogoUrl(settings.logo_url)
+    })
+  }, [])
 
   const isTransparent = isHome && !scrolled
 
@@ -47,7 +57,7 @@ export default function Navbar() {
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2 shrink-0">
             <img
-              src="https://miaoda-conversation-file.s3cdn.medo.dev/user-bo1v51m4ml1c/app-bu4kziuqa9dt/20260523/logo.jpeg"
+              src={getImageUrl(logoUrl)}
               alt="Stay Jazzy Multimedia"
               className="h-10 md:h-12 w-auto object-contain"
             />

@@ -12,10 +12,22 @@ import { Server } from 'socket.io'
 import app, { ensureSchema } from './app.js'
 
 const httpServer = createServer(app)
+const configuredOrigins = (process.env.ALLOWED_ORIGIN || '')
+  .split(',')
+  .map(origin => origin.trim())
+  .filter(Boolean)
+const allowedOrigins = [
+  'https://stayjazzy.vercel.app',
+  'https://stayjazzy-backend.vercel.app',
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'http://localhost:4000',
+  ...configuredOrigins,
+]
 
 const io = new Server(httpServer, {
   cors: {
-    origin: process.env.ALLOWED_ORIGIN || '*',
+    origin: allowedOrigins.includes('*') ? '*' : allowedOrigins,
     methods: ['GET', 'POST']
   }
 })

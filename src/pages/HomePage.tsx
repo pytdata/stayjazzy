@@ -7,6 +7,7 @@ import SocialSidebar from '@/components/common/SocialSidebar'
 import { getHeroSlides } from '@/db/api'
 import type { HeroSlide } from '@/types/types'
 import { trackPageView } from '@/db/api'
+import { getImageUrl } from '@/lib/mediaUrls'
 
 const DEFAULT_SLIDES: Partial<HeroSlide>[] = [
   { id: '1', title: 'Capturing Moments,\nCreating Memories', subtitle: 'Professional Multimedia Services for Events, Branding & Beyond', image_url: 'https://miaoda-site-img.s3cdn.medo.dev/images/KLing_0f631029-68b9-449f-9b3a-477672772737.jpg' },
@@ -66,7 +67,7 @@ export default function HomePage() {
         {/* Background */}
         <div
           className={`absolute inset-0 bg-cover bg-center transition-opacity duration-500 ${fading ? 'opacity-0' : 'opacity-100'}`}
-          style={{ backgroundImage: `url(${slide?.image_url})` }}
+          style={{ backgroundImage: `url(${getImageUrl(slide?.image_url)})` }}
         />
         <div className="hero-overlay absolute inset-0" />
 

@@ -4,6 +4,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { getAllSiteContent, getTeamMembers } from '@/db/api'
 import type { TeamMember } from '@/types/types'
 import { trackPageView } from '@/db/api'
+import { getImageUrl } from '@/lib/mediaUrls'
 
 const CORE_VALUES = ['Customer-focused', 'People-centered', 'Teamwork', 'Performance-driven', 'Leadership', 'Results-oriented', 'Tenacious', 'Maverick', 'Professionals', 'Ethical']
 
@@ -107,7 +108,7 @@ export default function WhoWeArePage() {
               <Card key={member.id} className="h-full border-border overflow-hidden">
                 <div className="aspect-[4/3] overflow-hidden">
                   <img
-                    src={member.image_url || 'https://miaoda-site-img.s3cdn.medo.dev/images/KLing_dde14cb7-c4ed-4ce3-bf0b-13220b0b042a.jpg'}
+                    src={getImageUrl(member.image_url || 'https://miaoda-site-img.s3cdn.medo.dev/images/KLing_dde14cb7-c4ed-4ce3-bf0b-13220b0b042a.jpg')}
                     alt={member.name}
                     className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
                   />

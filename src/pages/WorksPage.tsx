@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Play, X, ChevronLeft, ChevronRight, Video } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { getImageUrl, getVideoUrl, isEmbeddableVideoUrl } from '@/lib/mediaUrls'
 
 
 // ─── Lightbox ────────────────────────────────────────────────────
@@ -69,17 +70,27 @@ function Lightbox({ items, index, onClose, onPrev, onNext }: LightboxProps) {
       >
         <div className="relative rounded-xl overflow-hidden bg-black flex items-center justify-center">
           {isVideo ? (
-            <video
-              ref={videoRef}
-              src={work.video_url!}
-              controls
-              autoPlay
-              className="w-full max-h-[65vh] object-contain"
-              onClick={e => e.stopPropagation()}
-            />
+            isEmbeddableVideoUrl(work.video_url) ? (
+              <iframe
+                src={getVideoUrl(work.video_url)}
+                className="w-full aspect-video max-h-[65vh]"
+                allow="autoplay; fullscreen; picture-in-picture"
+                allowFullScreen
+                onClick={e => e.stopPropagation()}
+              />
+            ) : (
+              <video
+                ref={videoRef}
+                src={work.video_url!}
+                controls
+                autoPlay
+                className="w-full max-h-[65vh] object-contain"
+                onClick={e => e.stopPropagation()}
+              />
+            )
           ) : (
             <img
-              src={work.image_url ?? undefined}
+              src={getImageUrl(work.image_url)}
               alt={work.title}
               className="w-full max-h-[65vh] object-contain"
             />
@@ -125,7 +136,7 @@ function Lightbox({ items, index, onClose, onPrev, onNext }: LightboxProps) {
 // ─── WorkCard ────────────────────────────────────────────────────
 function WorkCard({ work, onClick }: { work: PortfolioWork; onClick: () => void }) {
   const isVideo = !!work.video_url
-  const thumb = work.image_url ?? 'https://miaoda-site-img.s3cdn.medo.dev/images/KLing_0f631029-68b9-449f-9b3a-477672772737.jpg'
+  const thumb = getImageUrl(work.image_url ?? 'https://miaoda-site-img.s3cdn.medo.dev/images/KLing_0f631029-68b9-449f-9b3a-477672772737.jpg')
 
   return (
     <Card

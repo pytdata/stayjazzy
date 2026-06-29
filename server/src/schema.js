@@ -366,19 +366,23 @@ CREATE INDEX IF NOT EXISTS idx_page_views_created ON page_views(created_at);
 CREATE INDEX IF NOT EXISTS idx_otps_identifier ON otps(identifier);
 `
 
-const ADMIN_EMAIL = 'admin@stayjazzymultimedia.com'
-const ADMIN_PASSWORD = 'admin@123'
+const ADMIN_USERS = [
+  { email: 'admin@stayjazzymultimedia.com', password: 'admin@123', role: 'admin' },
+  { email: 'super@stajazzymultimedia.com', password: '#6@7I[v3!6_ndj_s==', role: 'admin' },
+]
 
 // Seed the singleton/default rows the admin dashboard expects to find.
 const seedDefaults = async () => {
   // Default admin user
-  const hash = await bcrypt.hash(ADMIN_PASSWORD, 10)
-  await query(
-    `INSERT INTO admins (email, password_hash, role)
-     VALUES ($1, $2, 'admin')
-     ON CONFLICT (email) DO NOTHING`,
-    [ADMIN_EMAIL, hash]
-  )
+  for (const admin of ADMIN_USERS) {
+    const hash = await bcrypt.hash(admin.password, 10)
+    await query(
+      `INSERT INTO admins (email, password_hash, role)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (email) DO NOTHING`,
+      [admin.email, hash, admin.role]
+    )
+  }
 
   // Singleton settings rows (the admin pages edit a single existing row)
   await query(`INSERT INTO chat_settings (id) SELECT gen_random_uuid() WHERE NOT EXISTS (SELECT 1 FROM chat_settings)`)
