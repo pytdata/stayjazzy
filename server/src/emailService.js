@@ -252,6 +252,139 @@ function renderPaymentInstructions({ paymentRequest, invoice, dashboardUrl }) {
   </div>`;
 }
 
+function renderInvoicePaymentDetails(invoice = {}) {
+  const details = invoice.payment_details && typeof invoice.payment_details === 'object' ? invoice.payment_details : {};
+  const method = invoice.payment_method || details.method || 'paystack';
+  const instructions = details.offline_instructions || '';
+
+  if (method === 'bank_transfer') {
+    return `<div style="background:#fbf9f5;border:1px solid #eee5d8;border-radius:12px;padding:16px;margin-top:16px;">
+      <div style="font-weight:800;color:#201c18;margin-bottom:10px;">Bank transfer details</div>
+      ${details.bank_name ? `<p style="margin:0 0 6px;"><strong>Bank:</strong> ${escapeHtml(details.bank_name)}</p>` : ''}
+      ${details.bank_account_name ? `<p style="margin:0 0 6px;"><strong>Account name:</strong> ${escapeHtml(details.bank_account_name)}</p>` : ''}
+      ${details.bank_account_number ? `<p style="margin:0 0 6px;"><strong>Account number:</strong> ${escapeHtml(details.bank_account_number)}</p>` : ''}
+      ${instructions ? `<p style="margin:10px 0 0;color:#74695d;">${escapeHtml(instructions)}</p>` : ''}
+    </div>`;
+  }
+
+  if (method === 'momo_merchant') {
+    return `<div style="background:#fbf9f5;border:1px solid #eee5d8;border-radius:12px;padding:16px;margin-top:16px;">
+      <div style="font-weight:800;color:#201c18;margin-bottom:10px;">Merchant MoMo details</div>
+      ${details.merchant_momo_name ? `<p style="margin:0 0 6px;"><strong>Merchant name:</strong> ${escapeHtml(details.merchant_momo_name)}</p>` : ''}
+      ${details.merchant_momo_number ? `<p style="margin:0 0 6px;"><strong>Merchant number:</strong> ${escapeHtml(details.merchant_momo_number)}</p>` : ''}
+      ${instructions ? `<p style="margin:10px 0 0;color:#74695d;">${escapeHtml(instructions)}</p>` : ''}
+    </div>`;
+  }
+
+  if (method === 'cash') {
+    return `<div style="background:#fbf9f5;border:1px solid #eee5d8;border-radius:12px;padding:16px;margin-top:16px;">
+      <div style="font-weight:800;color:#201c18;margin-bottom:10px;">Cash payment</div>
+      <p style="margin:0;">Please make payment in person to Stay Jazzy Multimedia or an authorized team member.</p>
+      ${instructions ? `<p style="margin:10px 0 0;color:#74695d;">${escapeHtml(instructions)}</p>` : ''}
+    </div>`;
+  }
+
+  return '<p style="margin:16px 0 0;color:#74695d;">You may complete this invoice from your booking dashboard.</p>';
+}
+
+function renderMoneyRow(label, amount, currency = 'GHS', emphasis = false) {
+  return `<tr>
+    <td style="padding:10px 0;border-bottom:1px solid #eee5d8;color:${emphasis ? '#201c18' : '#74695d'};font-weight:${emphasis ? '800' : '400'};">${escapeHtml(label)}</td>
+    <td align="right" style="padding:10px 0;border-bottom:1px solid #eee5d8;color:${emphasis ? '#650029' : '#201c18'};font-weight:${emphasis ? '900' : '700'};">${escapeHtml(currency)} ${Number(amount || 0).toLocaleString()}</td>
+  </tr>`;
+}
+
+export function buildInvoiceEmail({ invoice, dashboardUrl }) {
+  const currency = invoice?.currency || 'GHS';
+  const invoiceRef = invoice?.invoice_number || String(invoice?.id || '').slice(0, 8).toUpperCase();
+  const total = Number(invoice?.total || 0);
+  const method = invoice?.payment_method || 'paystack';
+  const methodLabel = PAYMENT_METHOD_LABELS[method] || 'Payment';
+
+  const html = renderLayout({
+    preheader: `Invoice ${invoiceRef}: ${currency} ${total.toLocaleString()}.`,
+    title: `Invoice ${invoiceRef}`,
+    intro: `Hello ${escapeHtml(invoice?.customer_name || 'there')}, please find your Stay Jazzy Multimedia invoice below.`,
+    body: `<div style="border:1px solid #ead8aa;border-radius:14px;overflow:hidden;">
+      <div style="background:#f8f1df;padding:16px 18px;">
+        <div style="font-size:12px;letter-spacing:1.4px;text-transform:uppercase;color:#74695d;">Invoice To</div>
+        <div style="margin-top:6px;font-size:18px;font-weight:800;color:#201c18;">${escapeHtml(invoice?.customer_name || invoice?.customer_email || 'Client')}</div>
+        <div style="margin-top:3px;color:#74695d;">${escapeHtml(invoice?.customer_email || '')}</div>
+        ${invoice?.customer_phone ? `<div style="margin-top:3px;color:#74695d;">${escapeHtml(invoice.customer_phone)}</div>` : ''}
+      </div>
+      <div style="padding:18px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+          ${renderMoneyRow('Subtotal', invoice?.subtotal, currency)}
+          ${renderMoneyRow('Tax', invoice?.tax_amount, currency)}
+          ${renderMoneyRow('Discount', invoice?.discount_amount, currency)}
+          ${renderMoneyRow('Total Due', total, currency, true)}
+        </table>
+        <p style="margin:16px 0 0;"><strong>Payment mode:</strong> ${escapeHtml(methodLabel)}</p>
+        ${invoice?.notes ? `<p style="margin:10px 0 0;color:#74695d;">${escapeHtml(invoice.notes)}</p>` : ''}
+      </div>
+    </div>
+    ${renderInvoicePaymentDetails(invoice)}
+    ${dashboardUrl ? `<div style="margin-top:18px;text-align:center;"><a href="${escapeHtml(dashboardUrl)}" style="display:inline-block;background:#650029;color:#ffffff;text-decoration:none;border-radius:10px;padding:12px 18px;font-weight:800;">Open Booking Dashboard</a></div>` : ''}`,
+    footer: method === 'paystack'
+      ? 'Use the secure payment option in your booking dashboard to complete payment.'
+      : 'After payment is made, our admin team will verify it and send your receipt.',
+  });
+
+  return {
+    subject: `${BRAND_NAME} invoice ${invoiceRef}`,
+    text: [
+      `Invoice ${invoiceRef}`,
+      `Customer: ${invoice?.customer_name || invoice?.customer_email || 'Client'}`,
+      `Total due: ${currency} ${total.toLocaleString()}`,
+      `Payment mode: ${methodLabel}`,
+      dashboardUrl ? `Dashboard: ${dashboardUrl}` : '',
+      invoice?.notes ? `Notes: ${invoice.notes}` : '',
+    ].filter(Boolean).join('\n'),
+    html,
+  };
+}
+
+export function buildReceiptEmail({ receipt, invoice }) {
+  const currency = receipt?.currency || invoice?.currency || 'GHS';
+  const amount = Number(receipt?.amount || invoice?.total || 0);
+  const receiptRef = receipt?.receipt_number || String(receipt?.id || '').slice(0, 8).toUpperCase();
+  const invoiceRef = invoice?.invoice_number || String(receipt?.invoice_id || invoice?.id || '').slice(0, 8).toUpperCase();
+  const paidAt = receipt?.paid_at ? new Date(receipt.paid_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'Confirmed';
+
+  const html = renderLayout({
+    preheader: `Receipt ${receiptRef}: payment of ${currency} ${amount.toLocaleString()} confirmed.`,
+    title: `Receipt ${receiptRef}`,
+    intro: `Hello ${escapeHtml(receipt?.customer_name || invoice?.customer_name || 'there')}, thank you. Your payment has been confirmed.`,
+    body: `<div style="border:1px solid #cfe8d6;border-radius:14px;overflow:hidden;">
+      <div style="background:#ecfdf3;padding:16px 18px;">
+        <div style="font-size:12px;letter-spacing:1.4px;text-transform:uppercase;color:#166534;">Payment Confirmed</div>
+        <div style="margin-top:8px;font-size:28px;font-weight:900;color:#166534;">${escapeHtml(currency)} ${amount.toLocaleString()}</div>
+      </div>
+      <div style="padding:18px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+          <tr><td style="padding:8px 0;color:#74695d;">Receipt number</td><td align="right" style="padding:8px 0;font-weight:800;">${escapeHtml(receiptRef)}</td></tr>
+          <tr><td style="padding:8px 0;color:#74695d;">Invoice</td><td align="right" style="padding:8px 0;font-weight:800;">${escapeHtml(invoiceRef)}</td></tr>
+          <tr><td style="padding:8px 0;color:#74695d;">Payment method</td><td align="right" style="padding:8px 0;font-weight:800;">${escapeHtml(receipt?.payment_method || 'Payment')}</td></tr>
+          <tr><td style="padding:8px 0;color:#74695d;">Paid on</td><td align="right" style="padding:8px 0;font-weight:800;">${escapeHtml(paidAt)}</td></tr>
+        </table>
+      </div>
+    </div>`,
+    footer: 'We appreciate your trust in Stay Jazzy Multimedia. Please keep this receipt for your records.',
+  });
+
+  return {
+    subject: `${BRAND_NAME} receipt ${receiptRef}`,
+    text: [
+      `Receipt ${receiptRef}`,
+      `Invoice: ${invoiceRef}`,
+      `Amount paid: ${currency} ${amount.toLocaleString()}`,
+      `Payment method: ${receipt?.payment_method || 'Payment'}`,
+      `Paid on: ${paidAt}`,
+    ].join('\n'),
+    html,
+  };
+}
+
 export function buildPaymentRequestEmail({ booking, paymentRequest, invoice, dashboardUrl }) {
   const name = booking?.user_name ? escapeHtml(booking.user_name) : 'there';
   const amount = Number(paymentRequest?.amount || invoice?.total || 0);

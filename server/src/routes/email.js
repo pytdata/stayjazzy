@@ -7,8 +7,10 @@ import { ensureSchema } from '../schema.js';
 import {
   assertEmailConfigured,
   buildBookingConfirmationEmail,
+  buildInvoiceEmail,
   buildOtpEmail,
   buildPaymentRequestEmail,
+  buildReceiptEmail,
   describeEmailError,
   getEmailDiagnostics,
   sendEmail as sendSmtpEmail,
@@ -244,6 +246,28 @@ emailRouter.post('/payment-request', async (req, res) => {
     const recipient = booking?.user_email || invoice?.customer_email;
     const message = buildPaymentRequestEmail({ booking, paymentRequest, invoice, dashboardUrl });
     const info = await deliverEmail({ to: recipient, ...message });
+    res.json({ success: true, messageId: info.messageId });
+  } catch (error) {
+    handleEmailError(error, res);
+  }
+});
+
+emailRouter.post('/invoice', async (req, res) => {
+  try {
+    const { invoice, dashboardUrl } = req.body;
+    const message = buildInvoiceEmail({ invoice, dashboardUrl });
+    const info = await deliverEmail({ to: invoice?.customer_email, ...message });
+    res.json({ success: true, messageId: info.messageId });
+  } catch (error) {
+    handleEmailError(error, res);
+  }
+});
+
+emailRouter.post('/receipt', async (req, res) => {
+  try {
+    const { receipt, invoice } = req.body;
+    const message = buildReceiptEmail({ receipt, invoice });
+    const info = await deliverEmail({ to: receipt?.customer_email || invoice?.customer_email, ...message });
     res.json({ success: true, messageId: info.messageId });
   } catch (error) {
     handleEmailError(error, res);

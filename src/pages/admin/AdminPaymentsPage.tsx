@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   getPaymentTransactions, getPaymentRequests, getInvoices, getReceipts,
-  updatePaymentRequest, updateInvoice, createReceipt,
+  updatePaymentRequest, updateInvoice, createReceipt, sendInvoiceEmail, sendReceiptEmail,
 } from '@/db/api'
 import type { PaymentTransaction, PaymentRequest, Invoice, Receipt } from '@/types/types'
 import { toast } from 'sonner'
@@ -51,6 +51,31 @@ export default function AdminPaymentsPage() {
       Math.abs(Number(invoice.total) - Number(request.amount)) < 0.01
     )
 
+  const findInvoiceForReceipt = (receipt: Receipt) =>
+    invoices.find(invoice => invoice.id === receipt.invoice_id) ||
+    invoices.find(invoice =>
+      invoice.customer_email === receipt.customer_email &&
+      Math.abs(Number(invoice.total) - Number(receipt.amount)) < 0.01
+    )
+
+  const sendInvoiceToClient = async (invoice: Invoice) => {
+    try {
+      await sendInvoiceEmail(invoice, `${window.location.origin}/check-booking`)
+      toast.success(`Invoice sent to ${invoice.customer_email}`)
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to send invoice')
+    }
+  }
+
+  const sendReceiptToClient = async (receipt: Receipt) => {
+    try {
+      await sendReceiptEmail(receipt, findInvoiceForReceipt(receipt))
+      toast.success(`Receipt sent to ${receipt.customer_email}`)
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to send receipt')
+    }
+  }
+
   const markRequestPaid = async (request: PaymentRequest) => {
     if (!isManualPayment(request)) {
       toast.error('Paystack payment status is updated automatically after verification')
@@ -61,7 +86,7 @@ export default function AdminPaymentsPage() {
       await updatePaymentRequest(request.id, { status: 'paid' })
       if (invoice) {
         await updateInvoice(invoice.id, { status: 'paid' })
-        await createReceipt({
+        const receipt = await createReceipt({
           receipt_number: `RCP-${Date.now()}`,
           invoice_id: invoice.id,
           customer_name: invoice.customer_name,
@@ -71,6 +96,7 @@ export default function AdminPaymentsPage() {
           payment_method: PAYMENT_METHOD_LABELS[request.payment_method] || request.payment_method,
           paid_at: new Date().toISOString(),
         })
+        await sendReceiptEmail(receipt, invoice)
       }
       toast.success('Payment request marked as paid')
       await loadAll()
@@ -223,7 +249,7 @@ export default function AdminPaymentsPage() {
           <Card>
             <CardContent className="overflow-x-auto pt-6">
               <table className="w-full text-sm">
-                <thead className="border-b"><tr className="text-left"><th>Invoice #</th><th>Customer</th><th>Total</th><th>Status</th><th>Date</th></tr></thead>
+                <thead className="border-b"><tr className="text-left"><th>Invoice #</th><th>Customer</th><th>Total</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>
                 <tbody className="divide-y">
                   {invoices.map(i => (
                     <tr key={i.id}>
@@ -232,6 +258,11 @@ export default function AdminPaymentsPage() {
                       <td className="py-2 font-semibold">GHS {Number(i.total).toLocaleString()}</td>
                       <td className="py-2"><Badge variant={i.status === 'paid' ? 'default' : i.status === 'sent' ? 'secondary' : 'outline'}>{i.status}</Badge></td>
                       <td className="py-2 text-muted-foreground">{new Date(i.created_at).toLocaleDateString()}</td>
+                      <td className="py-2">
+                        <Button size="sm" variant="outline" onClick={() => sendInvoiceToClient(i)}>
+                          Send Invoice
+                        </Button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -245,7 +276,7 @@ export default function AdminPaymentsPage() {
           <Card>
             <CardContent className="overflow-x-auto pt-6">
               <table className="w-full text-sm">
-                <thead className="border-b"><tr className="text-left"><th>Receipt #</th><th>Customer</th><th>Amount</th><th>Method</th><th>Date</th></tr></thead>
+                <thead className="border-b"><tr className="text-left"><th>Receipt #</th><th>Customer</th><th>Amount</th><th>Method</th><th>Date</th><th>Actions</th></tr></thead>
                 <tbody className="divide-y">
                   {receipts.map(r => (
                     <tr key={r.id}>
@@ -254,6 +285,11 @@ export default function AdminPaymentsPage() {
                       <td className="py-2 font-semibold">GHS {Number(r.amount).toLocaleString()}</td>
                       <td className="py-2">{r.payment_method || '-'}</td>
                       <td className="py-2 text-muted-foreground">{new Date(r.paid_at).toLocaleDateString()}</td>
+                      <td className="py-2">
+                        <Button size="sm" variant="outline" onClick={() => sendReceiptToClient(r)}>
+                          Send Receipt
+                        </Button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>

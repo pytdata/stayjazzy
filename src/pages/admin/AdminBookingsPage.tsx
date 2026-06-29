@@ -110,6 +110,7 @@ function PaymentRequestDialog({
 
       // 2. Create invoice
       const invoice = await createInvoice({
+        invoice_number: `INV-${Date.now()}`,
         booking_id: booking.id,
         customer_name: booking.user_name || booking.user_email,
         customer_email: booking.user_email,

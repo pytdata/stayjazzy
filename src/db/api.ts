@@ -323,6 +323,12 @@ export async function sendPaymentRequestEmail(payload: {
 }) {
   return postEmail('payment-request', payload)
 }
+export async function sendInvoiceEmail(invoice: Invoice, dashboardUrl: string) {
+  return postEmail('invoice', { invoice, dashboardUrl })
+}
+export async function sendReceiptEmail(receipt: import('@/types/types').Receipt, invoice?: Invoice | null) {
+  return postEmail('receipt', { receipt, invoice })
+}
 export async function saveOTP(identifier: string, code: string) {
   await supabase.from('otps').delete().eq('identifier', identifier)
   return supabase.from('otps').insert({ identifier, otp_code: code, expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString() })
