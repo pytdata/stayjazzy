@@ -5,11 +5,22 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
-import { getBookingById, getBookingStages, getChatMessages, sendChatMessageObj as sendChatMessage, cancelBooking } from '@/db/api'
+import {
+  cancelBooking,
+  getBookingById,
+  getBookingStages,
+  getChatMessages,
+  getInvoicesByBooking,
+  getPaymentRequestsByBooking,
+  sendChatMessageObj as sendChatMessage,
+  updateInvoice,
+  updatePaymentRequest,
+} from '@/db/api'
 import { useBooking } from '@/contexts/BookingContext'
+import PaystackButton from '@/components/payments/PaystackButton'
 import { toast } from 'sonner'
-import { Send, MessageCircle, CheckCircle, Clock, AlertCircle, Loader2, XCircle } from 'lucide-react'
-import type { Booking, BookingStageRecord as BookingStage, BookingChatMessage, SelectedService } from '@/types/types'
+import { Send, MessageCircle, CheckCircle, Clock, AlertCircle, Loader2, XCircle, CreditCard } from 'lucide-react'
+import type { Booking, BookingStageRecord as BookingStage, BookingChatMessage, SelectedService, PaymentRequest, Invoice } from '@/types/types'
 import { format } from 'date-fns'
 
 const STAGES = ['Initial Payment', 'In Progress', 'Review', 'Final Stage', 'Completed'] as const
@@ -52,6 +63,8 @@ export default function BookingDashboardPage() {
   const [booking, setBooking] = useState<Booking | null>(null)
   const [stages, setStages] = useState<BookingStage[]>([])
   const [messages, setMessages] = useState<BookingChatMessage[]>([])
+  const [paymentRequests, setPaymentRequests] = useState<PaymentRequest[]>([])
+  const [invoices, setInvoices] = useState<Invoice[]>([])
   const [newMsg, setNewMsg] = useState('')
   const [sending, setSending] = useState(false)
   const [cancelling, setCancelling] = useState(false)
@@ -69,10 +82,18 @@ export default function BookingDashboardPage() {
   const loadData = async () => {
     if (!id) return
     try {
-      const [bk, stgs, msgs] = await Promise.all([getBookingById(id), getBookingStages(id), getChatMessages(id)])
+      const [bk, stgs, msgs, reqs, invs] = await Promise.all([
+        getBookingById(id),
+        getBookingStages(id),
+        getChatMessages(id),
+        getPaymentRequestsByBooking(id),
+        getInvoicesByBooking(id),
+      ])
       setBooking(bk)
       setStages(stgs)
       setMessages(msgs)
+      setPaymentRequests(reqs)
+      setInvoices(invs)
     } catch { /* silent */ }
     finally { setLoading(false) }
   }
@@ -113,6 +134,23 @@ export default function BookingDashboardPage() {
     finally { setCancelling(false) }
   }
 
+  const getInvoiceForRequest = (request: PaymentRequest) =>
+    invoices.find(invoice =>
+      invoice.status !== 'paid' &&
+      Math.abs(Number(invoice.total) - Number(request.amount)) < 0.01 &&
+      (!invoice.notes || invoice.notes.includes(request.stage_name))
+    ) || invoices.find(invoice =>
+      invoice.status !== 'paid' &&
+      Math.abs(Number(invoice.total) - Number(request.amount)) < 0.01
+    )
+
+  const markPaymentComplete = async (request: PaymentRequest, invoice?: Invoice) => {
+    await updatePaymentRequest(request.id, { status: 'paid' })
+    if (invoice) await updateInvoice(invoice.id, { status: 'paid' })
+    toast.success('Payment request marked as paid.')
+    await loadData()
+  }
+
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center pt-16">
       <Loader2 className="h-10 w-10 animate-spin text-primary" />
@@ -132,6 +170,7 @@ export default function BookingDashboardPage() {
   const canChat = !isCancelled && !isCompleted
   const currentStage = stages.find(s => s.status === 'in_progress')?.stage_name || stages[stages.length - 1]?.stage_name || 'Initial Payment'
   const services: SelectedService[] = Array.isArray(booking.selected_services) ? booking.selected_services : []
+  const visiblePaymentRequests = paymentRequests.filter(request => request.status !== 'cancelled')
 
   const statusColor = isCancelled ? 'bg-red-100 text-red-700' : isCompleted ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'
 
@@ -179,6 +218,53 @@ export default function BookingDashboardPage() {
             <StageIndicator stages={stages} currentStage={currentStage} />
           </CardContent>
         </Card>
+
+        {visiblePaymentRequests.length > 0 && (
+          <Card className="border-border">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <CreditCard className="h-4 w-4 text-primary" /> Payment Requests
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {visiblePaymentRequests.map(request => {
+                const invoice = getInvoiceForRequest(request)
+                const isPaid = request.status === 'paid'
+                return (
+                  <div key={request.id} className="flex flex-col md:flex-row md:items-center justify-between gap-3 rounded-lg border border-border bg-background p-3">
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-semibold">{request.stage_name}</p>
+                        <Badge variant={isPaid ? 'default' : 'secondary'}>{request.status}</Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {Number(request.percentage).toLocaleString()}% requested
+                        {request.due_date ? ` · Due ${format(new Date(request.due_date), 'PPP')}` : ''}
+                      </p>
+                      <p className="text-lg font-bold text-primary mt-1">GHS {Number(request.amount).toLocaleString()}</p>
+                    </div>
+                    {isPaid ? (
+                      <div className="inline-flex items-center text-sm font-semibold text-green-700">
+                        <CheckCircle className="h-4 w-4 mr-1.5" /> Paid
+                      </div>
+                    ) : (
+                      <PaystackButton
+                        email={booking.user_email}
+                        amountGHS={Number(request.amount)}
+                        bookingId={booking.id}
+                        invoiceId={invoice?.id}
+                        customerName={booking.user_name || booking.user_email}
+                        label="Pay Request"
+                        onSuccess={() => markPaymentComplete(request, invoice)}
+                        className="shrink-0 bg-primary text-primary-foreground"
+                      />
+                    )}
+                  </div>
+                )
+              })}
+            </CardContent>
+          </Card>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Booking details */}

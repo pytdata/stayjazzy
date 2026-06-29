@@ -18,7 +18,7 @@ async function request<T = unknown>(
     },
   })
   const data = await res.json()
-  if (!res.ok) throw new Error(data?.error ?? `API error ${res.status}`)
+  if (!res.ok) throw new Error(data?.error ?? data?.message ?? `API error ${res.status}`)
   return data as T
 }
 

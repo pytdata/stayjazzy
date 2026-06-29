@@ -465,6 +465,12 @@ export async function getPaymentTransactions() {
   return (data ?? []) as import('@/types/types').PaymentTransaction[]
 }
 
+export async function updatePaymentTransactionByReference(reference: string, payload: Partial<import('@/types/types').PaymentTransaction>) {
+  const { data, error } = await supabase.from('payment_transactions').update(payload).eq('reference', reference).select().single()
+  if (error) throw error
+  return data as import('@/types/types').PaymentTransaction
+}
+
 export async function createPaymentRequest(payload: Partial<import('@/types/types').PaymentRequest>) {
   const { data, error } = await supabase.from('payment_requests').insert(payload).select().single()
   if (error) throw error
@@ -473,6 +479,11 @@ export async function createPaymentRequest(payload: Partial<import('@/types/type
 
 export async function getPaymentRequests() {
   const { data } = await supabase.from('payment_requests').select('*').order('created_at', { ascending: false })
+  return (data ?? []) as import('@/types/types').PaymentRequest[]
+}
+
+export async function getPaymentRequestsByBooking(bookingId: string) {
+  const { data } = await supabase.from('payment_requests').select('*').eq('booking_id', bookingId).order('created_at', { ascending: false })
   return (data ?? []) as import('@/types/types').PaymentRequest[]
 }
 
@@ -491,6 +502,11 @@ export async function createInvoice(payload: Partial<import('@/types/types').Inv
 
 export async function getInvoices() {
   const { data } = await supabase.from('invoices').select('*').order('created_at', { ascending: false })
+  return (data ?? []) as import('@/types/types').Invoice[]
+}
+
+export async function getInvoicesByBooking(bookingId: string) {
+  const { data } = await supabase.from('invoices').select('*').eq('booking_id', bookingId).order('created_at', { ascending: false })
   return (data ?? []) as import('@/types/types').Invoice[]
 }
 

@@ -8,12 +8,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog'
-import { getAllBookings, getBookingById, getBookingStages, getChatMessages, sendChatMessageObj as sendChatMessage, updateBookingStage, createBookingStage, createPaymentRequest, createInvoice } from '@/db/api'
+import { getAllBookings, getBookingStages, getChatMessages, sendChatMessageObj as sendChatMessage, updateBookingStage, createBookingStage, createPaymentRequest, createInvoice } from '@/db/api'
 import type { Booking, BookingChatMessage, BookingStageRecord as BookingStage } from '@/types/types'
-import { paystackApi, PAYSTACK_PUBLIC_KEY } from '@/lib/apiClient'
-import { db as supabase } from '@/db/dbClient'
 import { toast } from 'sonner'
-import { MessageCircle, Send, ChevronDown, ChevronUp, Loader2, CreditCard, FileText } from 'lucide-react'
+import { MessageCircle, Send, ChevronDown, ChevronUp, Loader2, CreditCard } from 'lucide-react'
 import { format } from 'date-fns'
 
 const STAGE_OPTIONS = ['Initial Payment', 'In Progress', 'Review', 'Final Stage', 'Completed']
@@ -70,7 +68,7 @@ function PaymentRequestDialog({
     try {
       const amount = Number(computedAmount)
       // 1. Create payment request record
-      const payReq = await createPaymentRequest({
+      await createPaymentRequest({
         booking_id: booking.id,
         stage_name: stageName,
         percentage: Number(percentage),

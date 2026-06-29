@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Loader2, CreditCard } from 'lucide-react'
 import { paystackApi, PAYSTACK_PUBLIC_KEY } from '@/lib/apiClient'
-import { createPaymentTransaction, createReceipt } from '@/db/api'
+import { createPaymentTransaction, createReceipt, updatePaymentTransactionByReference } from '@/db/api'
 import { toast } from 'sonner'
 
 interface PaystackButtonProps {
@@ -11,7 +11,7 @@ interface PaystackButtonProps {
   bookingId?: string
   invoiceId?: string
   customerName?: string
-  onSuccess?: (reference: string) => void
+  onSuccess?: (reference: string) => void | Promise<void>
   label?: string
   className?: string
 }
@@ -67,7 +67,7 @@ export default function PaystackButton({
       // 3. Open Paystack popup using their inline JS (loaded via CDN in index.html)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const PaystackPop = (window as any).PaystackPop
-      if (!PaystackPop) {
+      if (!PaystackPop || !PAYSTACK_PUBLIC_KEY) {
         // Fallback: redirect to authorization_url
         window.location.href = initRes.data.authorization_url
         return
@@ -84,41 +84,48 @@ export default function PaystackButton({
           setLoading(false)
         },
         callback: async (response: { reference: string }) => {
-          // 4. Verify on the Node.js backend
-          const verify = await paystackApi.verify(response.reference)
-          if (verify.data.status === 'success') {
-            // 5. Update transaction record in Supabase
-            await import('@/db/dbClient').then(({ db: supabase }) =>
-              supabase.from('payment_transactions').update({
+          try {
+            // 4. Verify on the Node.js backend
+            const verify = await paystackApi.verify(response.reference)
+            if (verify.data.status === 'success') {
+              // 5. Update transaction record in Supabase
+              await updatePaymentTransactionByReference(response.reference, {
                 status: 'success',
                 paid_at: verify.data.paid_at,
                 gateway_response: verify.data,
-              }).eq('reference', response.reference)
-            )
+              })
 
-            // 6. Generate receipt
-            await createReceipt({
-              receipt_number: `RCP-${Date.now()}`,
-              transaction_id: txn.id,
-              invoice_id: invoiceId,
-              customer_name: customerName || email,
-              customer_email: email,
-              amount: amountGHS,
-              currency: 'GHS',
-              payment_method: 'Paystack',
-              paid_at: verify.data.paid_at || new Date().toISOString(),
-            })
+              // 6. Generate receipt. Payment status should still update if receipt creation fails.
+              let receiptRecorded = true
+              try {
+                await createReceipt({
+                  receipt_number: `RCP-${Date.now()}`,
+                  transaction_id: txn.id,
+                  invoice_id: invoiceId,
+                  customer_name: customerName || email,
+                  customer_email: email,
+                  amount: amountGHS,
+                  currency: 'GHS',
+                  payment_method: 'Paystack',
+                  paid_at: verify.data.paid_at || new Date().toISOString(),
+                })
+              } catch {
+                receiptRecorded = false
+                toast.warning('Payment succeeded, but the receipt could not be recorded automatically.')
+              }
 
-            toast.success('Payment successful! Your receipt has been recorded.')
-            onSuccess?.(response.reference)
-          } else {
-            // Mark as failed
-            await import('@/db/dbClient').then(({ db: supabase }) =>
-              supabase.from('payment_transactions').update({ status: 'failed' }).eq('reference', response.reference)
-            )
-            toast.error('Payment was not successful. Please try again.')
+              toast.success(receiptRecorded ? 'Payment successful! Your receipt has been recorded.' : 'Payment successful!')
+              await onSuccess?.(response.reference)
+            } else {
+              // Mark as failed
+              await updatePaymentTransactionByReference(response.reference, { status: 'failed' })
+              toast.error('Payment was not successful. Please try again.')
+            }
+          } catch (e: any) {
+            toast.error(e.message || 'Payment verification failed')
+          } finally {
+            setLoading(false)
           }
-          setLoading(false)
         },
       })
 
