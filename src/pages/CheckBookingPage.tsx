@@ -6,14 +6,12 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent } from '@/components/ui/card'
-import { getBookingByEmailOrPhone, saveOTP, verifyOTP } from '@/db/api'
+import { generateOTP, getBookingByEmailOrPhone, saveOTP, sendOTPEmail, verifyOTP } from '@/db/api'
 import { useBooking } from '@/contexts/BookingContext'
 import { toast } from 'sonner'
 import { trackPageView } from '@/db/api'
 
 type Step = 'lookup' | 'otp' | 'found_cancelled'
-
-function generateOTP() { return Math.floor(100000 + Math.random() * 900000).toString() }
 
 export default function CheckBookingPage() {
   const navigate = useNavigate()
@@ -23,7 +21,7 @@ export default function CheckBookingPage() {
   const [otp, setOtp] = useState('')
   const [loading, setLoading] = useState(false)
   const [bookingId, setBookingId] = useState<string | null>(null)
-  const [shownOtp, setShownOtp] = useState<string | null>(null)
+  const [otpEmail, setOtpEmail] = useState('')
 
   useEffect(() => { trackPageView('/check-booking') }, [])
 
@@ -36,11 +34,12 @@ export default function CheckBookingPage() {
       if (booking.status === 'cancelled') { setStep('found_cancelled'); return }
       setBookingId(booking.id)
       const code = generateOTP()
-      setShownOtp(code)
-      await saveOTP(identifier.trim(), code)
-      toast.success(`OTP sent! (Demo: ${code})`)
+      await saveOTP(booking.user_email, code)
+      await sendOTPEmail(booking.user_email, code, 'booking dashboard access')
+      setOtpEmail(booking.user_email)
+      toast.success('OTP sent to your email.')
       setStep('otp')
-    } catch { toast.error('Error checking booking. Please try again.') }
+    } catch (error) { toast.error(error instanceof Error ? error.message : 'Error checking booking. Please try again.') }
     finally { setLoading(false) }
   }
 
@@ -49,7 +48,7 @@ export default function CheckBookingPage() {
     if (!bookingId) return
     setLoading(true)
     try {
-      const valid = await verifyOTP(identifier.trim(), otp.trim())
+      const valid = await verifyOTP(otpEmail, otp.trim())
       if (!valid) { toast.error('Invalid or expired OTP.'); setLoading(false); return }
       setCurrentBookingId(bookingId)
       setBookingToken(`bk_${bookingId}`)
@@ -93,8 +92,7 @@ export default function CheckBookingPage() {
             {step === 'otp' && (
               <form onSubmit={handleOtpVerify} className="space-y-4">
                 <div className="bg-primary/10 rounded-lg p-3 text-sm text-primary">
-                  Booking found! An OTP has been sent to <strong>{identifier}</strong>.
-                  {shownOtp && <div className="mt-1 font-bold text-lg">Demo OTP: {shownOtp}</div>}
+                  Booking found! An OTP has been sent to <strong>{otpEmail}</strong>.
                 </div>
                 <div className="space-y-1">
                   <Label htmlFor="ck-otp">Enter 6-digit OTP</Label>

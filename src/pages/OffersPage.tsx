@@ -28,7 +28,7 @@ interface TierCardProps {
   subService: SubService
   packageName: string
   features: PricingFeature[]
-  onBook: () => void
+  onBook: (service?: SelectedService) => void
 }
 
 function TierCard({ tier, subService, packageName, features, onBook }: TierCardProps) {
@@ -40,9 +40,7 @@ function TierCard({ tier, subService, packageName, features, onBook }: TierCardP
   }
   const isSelected = selectedServices.some(s => s.sub_service_id === subService.id && s.tier_type === tier.tier_type)
 
-  const toggle = () => {
-    if (isSelected) { removeService(subService.id, tier.tier_type); return }
-    const svc: SelectedService = {
+  const getSelectedService = (): SelectedService => ({
       sub_service_id: subService.id,
       sub_service_name: subService.name,
       package_name: packageName,
@@ -50,8 +48,18 @@ function TierCard({ tier, subService, packageName, features, onBook }: TierCardP
       tier_name: `${cfg.label} ${subService.name}`,
       price: tier.price,
       currency: tier.currency,
-    }
+  })
+
+  const toggle = () => {
+    if (isSelected) { removeService(subService.id, tier.tier_type); return }
+    const svc = getSelectedService()
     addService(svc)
+  }
+
+  const bookSelectedTier = () => {
+    const svc = getSelectedService()
+    if (!isSelected) addService(svc)
+    onBook(svc)
   }
 
   const included = features.filter(f => f.is_included)
@@ -103,7 +111,7 @@ function TierCard({ tier, subService, packageName, features, onBook }: TierCardP
           >
             {isSelected ? <><Check className="h-4 w-4 mr-1" /> Selected</> : 'Select Package'}
           </Button>
-          <Button onClick={onBook} className="w-full bg-primary text-primary-foreground text-sm" size="sm">
+          <Button onClick={bookSelectedTier} className="w-full bg-primary text-primary-foreground text-sm" size="sm">
             <ShoppingBag className="h-4 w-4 mr-1.5" /> Book Appointment
           </Button>
         </div>
@@ -126,7 +134,7 @@ interface PackageData {
 function SubServiceTabs({ sections, packageName, onBook }: {
   sections: SubServiceSection[]
   packageName: string
-  onBook: () => void
+  onBook: (service?: SelectedService) => void
 }) {
   if (sections.length === 0) {
     return <p className="text-muted-foreground text-center py-12">No sub-services added yet.</p>
@@ -160,7 +168,7 @@ function SubServiceTabs({ sections, packageName, onBook }: {
               <p className="text-sm font-medium">
                 Pricing for <strong>{subService.name}</strong> coming soon.
               </p>
-              <Button size="sm" onClick={onBook} className="mt-1">
+              <Button size="sm" onClick={() => onBook()} className="mt-1">
                 <ShoppingBag className="h-4 w-4 mr-1.5" /> Enquire Now
               </Button>
             </div>
@@ -226,7 +234,7 @@ export default function OffersPage() {
     setLoading(false)
   }
 
-  const handleBook = () => setBookingOpen(true)
+  const handleBook = (_service?: SelectedService) => setBookingOpen(true)
 
   const submitCustomRequest = async () => {
     if (!customRequest.trim() || !customName.trim() || !customEmail.trim()) {
@@ -271,7 +279,7 @@ export default function OffersPage() {
               size="sm"
               variant="ghost"
               className="border border-white/60 text-white hover:bg-white/10 font-semibold"
-              onClick={handleBook}
+              onClick={() => handleBook()}
             >
               Book Now
             </Button>

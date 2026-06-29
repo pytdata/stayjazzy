@@ -25,11 +25,19 @@ const allowedOrigins = [
   'http://localhost:5174',
   'http://localhost:4000',
   ...configuredOrigins,
-]
+].filter(origin => origin !== '*')
+
+const socketCorsOrigin = (origin, callback) => {
+  if (!origin || allowedOrigins.includes(origin)) {
+    callback(null, true)
+    return
+  }
+  callback(new Error('Socket.IO origin not allowed'))
+}
 
 const io = new Server(httpServer, {
   cors: {
-    origin: allowedOrigins.includes('*') ? '*' : allowedOrigins,
+    origin: socketCorsOrigin,
     methods: ['GET', 'POST']
   }
 })

@@ -8,13 +8,13 @@ import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { Plus, Trash2, Loader2, GripVertical } from 'lucide-react'
+import { Plus, Trash2, Loader2, GripVertical, Edit } from 'lucide-react'
 import MediaUpload from '@/components/ui/MediaUpload'
 import {
-  getHeroSlides, createHeroSlide, deleteHeroSlide,
+  getHeroSlides, createHeroSlide, updateHeroSlide, deleteHeroSlide,
   getAllSiteContent, upsertSiteContent,
-  getTeamMembers, createTeamMember, deleteTeamMember,
-  getPortfolioWorks, createPortfolioWork, deletePortfolioWork,
+  getTeamMembers, createTeamMember, updateTeamMember, deleteTeamMember,
+  getPortfolioWorks, createPortfolioWork, updatePortfolioWork, deletePortfolioWork,
   getPortfolioCategories, createPortfolioCategory, updatePortfolioCategory, deletePortfolioCategory,
   getFAQs, createFAQ, deleteFAQ
 } from '@/db/api'
@@ -27,30 +27,51 @@ function SlideManager() {
   const [form, setForm] = useState({ title: '', subtitle: '', image_url: '' })
   const [adding, setAdding] = useState(false)
   const [open, setOpen] = useState(false)
+  const [editId, setEditId] = useState<string | null>(null)
 
   const load = () => getHeroSlides().then(setSlides)
   useEffect(() => { load() }, [])
 
-  const add = async () => {
+  const resetForm = () => {
+    setForm({ title: '', subtitle: '', image_url: '' })
+    setEditId(null)
+  }
+
+  const save = async () => {
     if (!form.image_url.trim()) { toast.error('Image URL is required'); return }
     setAdding(true)
-    try { await createHeroSlide({ title: form.title, subtitle: form.subtitle, image_url: form.image_url }); setForm({ title: '', subtitle: '', image_url: '' }); setOpen(false); load() }
-    catch { toast.error('Failed to add slide') } finally { setAdding(false) }
+    try {
+      const wasEditing = Boolean(editId)
+      const payload = { title: form.title, subtitle: form.subtitle, image_url: form.image_url }
+      if (editId) await updateHeroSlide(editId, payload)
+      else await createHeroSlide(payload)
+      resetForm()
+      setOpen(false)
+      load()
+      toast.success(wasEditing ? 'Slide updated' : 'Slide added')
+    }
+    catch { toast.error(editId ? 'Failed to update slide' : 'Failed to add slide') } finally { setAdding(false) }
   }
   const remove = async (id: string) => { if (!id) return; await deleteHeroSlide(id); load(); toast.success('Deleted') }
+  const handleEdit = (slide: Partial<HeroSlide>) => {
+    if (!slide.id) return
+    setEditId(slide.id)
+    setForm({ title: slide.title || '', subtitle: slide.subtitle || '', image_url: slide.image_url || '' })
+    setOpen(true)
+  }
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between"><h3 className="font-semibold">Hero Slides</h3>
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog open={open} onOpenChange={o => { setOpen(o); if (!o) resetForm() }}>
           <DialogTrigger asChild><Button size="sm" className="bg-primary text-primary-foreground gap-1"><Plus className="h-3.5 w-3.5" /> Add Slide</Button></DialogTrigger>
           <DialogContent className="max-w-[calc(100%-2rem)] md:max-w-md">
-            <DialogHeader><DialogTitle>New Hero Slide</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>{editId ? 'Edit Hero Slide' : 'New Hero Slide'}</DialogTitle></DialogHeader>
             <div className="space-y-3">
               <div className="space-y-1"><Label>Title</Label><Input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="Slide title" /></div>
               <div className="space-y-1"><Label>Subtitle</Label><Textarea value={form.subtitle} onChange={e => setForm(f => ({ ...f, subtitle: e.target.value }))} placeholder="Slide subtitle" rows={2} /></div>
               <MediaUpload label="Slide Image *" value={form.image_url} onChange={url => setForm(f => ({ ...f, image_url: url }))} accept="image" />
-              <Button onClick={add} disabled={adding} className="w-full bg-primary text-primary-foreground">{adding ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null} Add Slide</Button>
+              <Button onClick={save} disabled={adding} className="w-full bg-primary text-primary-foreground">{adding ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null} {editId ? 'Save Changes' : 'Add Slide'}</Button>
             </div>
           </DialogContent>
         </Dialog>
@@ -61,7 +82,10 @@ function SlideManager() {
             <div className="aspect-video"><img src={getImageUrl(s.image_url)} alt={s.title ?? undefined} className="w-full h-full object-cover" /></div>
             <div className="p-3 flex items-center justify-between gap-2">
               <div className="min-w-0"><p className="font-medium text-sm truncate">{s.title || 'Untitled'}</p></div>
-              <Button size="sm" variant="outline" onClick={() => s.id && remove(s.id)} className="text-destructive border-destructive/30 shrink-0"><Trash2 className="h-3.5 w-3.5" /></Button>
+              <div className="flex items-center gap-2 shrink-0">
+                <Button size="sm" variant="outline" onClick={() => handleEdit(s)}><Edit className="h-3.5 w-3.5" /></Button>
+                <Button size="sm" variant="outline" onClick={() => s.id && remove(s.id)} className="text-destructive border-destructive/30"><Trash2 className="h-3.5 w-3.5" /></Button>
+              </div>
             </div>
           </div>
         ))}
@@ -111,31 +135,52 @@ function TeamManager() {
   const [form, setForm] = useState({ name: '', role: '', bio: '', image_url: '' })
   const [adding, setAdding] = useState(false)
   const [open, setOpen] = useState(false)
+  const [editId, setEditId] = useState<string | null>(null)
 
   const load = () => getTeamMembers().then(setTeam)
   useEffect(() => { load() }, [])
 
-  const add = async () => {
+  const resetForm = () => {
+    setForm({ name: '', role: '', bio: '', image_url: '' })
+    setEditId(null)
+  }
+
+  const save = async () => {
     if (!form.name.trim()) { toast.error('Name is required'); return }
     setAdding(true)
-    try { await createTeamMember({ name: form.name, role: form.role, bio: form.bio, image_url: form.image_url }); setForm({ name: '', role: '', bio: '', image_url: '' }); setOpen(false); load() }
-    catch { toast.error('Failed to add member') } finally { setAdding(false) }
+    try {
+      const wasEditing = Boolean(editId)
+      const payload = { name: form.name, role: form.role, bio: form.bio, image_url: form.image_url }
+      if (editId) await updateTeamMember(editId, payload)
+      else await createTeamMember(payload)
+      resetForm()
+      setOpen(false)
+      load()
+      toast.success(wasEditing ? 'Member updated' : 'Member added')
+    }
+    catch { toast.error(editId ? 'Failed to update member' : 'Failed to add member') } finally { setAdding(false) }
   }
   const remove = async (id: string) => { if (!id) return; await deleteTeamMember(id); load() }
+  const handleEdit = (member: Partial<TeamMember>) => {
+    if (!member.id) return
+    setEditId(member.id)
+    setForm({ name: member.name || '', role: member.role || '', bio: member.bio || '', image_url: member.image_url || '' })
+    setOpen(true)
+  }
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between"><h3 className="font-semibold">Team Members</h3>
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog open={open} onOpenChange={o => { setOpen(o); if (!o) resetForm() }}>
           <DialogTrigger asChild><Button size="sm" className="bg-primary text-primary-foreground gap-1"><Plus className="h-3.5 w-3.5" /> Add Member</Button></DialogTrigger>
           <DialogContent className="max-w-[calc(100%-2rem)] md:max-w-md">
-            <DialogHeader><DialogTitle>New Team Member</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>{editId ? 'Edit Team Member' : 'New Team Member'}</DialogTitle></DialogHeader>
             <div className="space-y-3">
               <div className="space-y-1"><Label>Name *</Label><Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} /></div>
               <div className="space-y-1"><Label>Role/Title</Label><Input value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))} /></div>
               <div className="space-y-1"><Label>Bio</Label><Textarea value={form.bio} onChange={e => setForm(f => ({ ...f, bio: e.target.value }))} rows={2} /></div>
               <MediaUpload label="Photo" value={form.image_url} onChange={url => setForm(f => ({ ...f, image_url: url }))} accept="image" />
-              <Button onClick={add} disabled={adding} className="w-full bg-primary text-primary-foreground">{adding ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null} Add Member</Button>
+              <Button onClick={save} disabled={adding} className="w-full bg-primary text-primary-foreground">{adding ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null} {editId ? 'Save Changes' : 'Add Member'}</Button>
             </div>
           </DialogContent>
         </Dialog>
@@ -148,7 +193,10 @@ function TeamManager() {
               <p className="font-semibold text-sm">{m.name}</p>
               <p className="text-xs text-primary">{m.role}</p>
             </div>
-            <Button size="sm" variant="outline" onClick={() => m.id && remove(m.id)} className="text-destructive border-destructive/30 shrink-0"><Trash2 className="h-3.5 w-3.5" /></Button>
+            <div className="flex items-center gap-2 shrink-0">
+              <Button size="sm" variant="outline" onClick={() => handleEdit(m)}><Edit className="h-3.5 w-3.5" /></Button>
+              <Button size="sm" variant="outline" onClick={() => m.id && remove(m.id)} className="text-destructive border-destructive/30"><Trash2 className="h-3.5 w-3.5" /></Button>
+            </div>
           </div>
         ))}
       </div>
@@ -237,36 +285,58 @@ function WorksManager() {
   const [form, setForm] = useState({ title: '', category: '', description: '', image_url: '', video_url: '' })
   const [adding, setAdding] = useState(false)
   const [open, setOpen] = useState(false)
+  const [editId, setEditId] = useState<string | null>(null)
 
   const load = () => { getPortfolioWorks().then(setWorks); getPortfolioCategories().then(setCategories); }
   useEffect(() => { load() }, [])
 
-  const add = async () => {
+  const resetForm = () => {
+    setForm({ title: '', category: '', description: '', image_url: '', video_url: '' })
+    setEditId(null)
+  }
+
+  const save = async () => {
     if (!form.title.trim()) { toast.error('Title is required'); return }
     setAdding(true)
     try {
-      await createPortfolioWork({
+      const wasEditing = Boolean(editId)
+      const payload = {
         title: form.title,
         category: form.category,
         description: form.description,
         image_url: form.image_url || null,
         video_url: form.video_url || null,
-      })
-      setForm({ title: '', category: '', description: '', image_url: '', video_url: '' })
+      }
+      if (editId) await updatePortfolioWork(editId, payload)
+      else await createPortfolioWork(payload)
+      resetForm()
       setOpen(false)
       load()
+      toast.success(wasEditing ? 'Work updated' : 'Work added')
     }
-    catch { toast.error('Failed to add work') } finally { setAdding(false) }
+    catch { toast.error(editId ? 'Failed to update work' : 'Failed to add work') } finally { setAdding(false) }
   }
   const remove = async (id: string) => { if (!id) return; await deletePortfolioWork(id); load() }
+  const handleEdit = (work: Partial<PortfolioWork>) => {
+    if (!work.id) return
+    setEditId(work.id)
+    setForm({
+      title: work.title || '',
+      category: work.category || '',
+      description: work.description || '',
+      image_url: work.image_url || '',
+      video_url: work.video_url || '',
+    })
+    setOpen(true)
+  }
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between"><h3 className="font-semibold">Portfolio Works</h3>
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog open={open} onOpenChange={o => { setOpen(o); if (!o) resetForm() }}>
           <DialogTrigger asChild><Button size="sm" className="bg-primary text-primary-foreground gap-1"><Plus className="h-3.5 w-3.5" /> Add Work</Button></DialogTrigger>
           <DialogContent className="max-w-[calc(100%-2rem)] md:max-w-md">
-            <DialogHeader><DialogTitle>Add Portfolio Work</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>{editId ? 'Edit Portfolio Work' : 'Add Portfolio Work'}</DialogTitle></DialogHeader>
             <div className="space-y-3">
               <div className="space-y-1"><Label>Title *</Label><Input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} /></div>
               <div className="space-y-1"><Label>Category</Label><Select value={form.category} onValueChange={v => setForm(f => ({ ...f, category: v }))}>
@@ -278,7 +348,7 @@ function WorksManager() {
               <div className="space-y-1"><Label>Description</Label><Textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={2} /></div>
               <MediaUpload label="Cover Image" value={form.image_url} onChange={url => setForm(f => ({ ...f, image_url: url }))} accept="image" />
               <MediaUpload label="Video (optional)" value={form.video_url} onChange={url => setForm(f => ({ ...f, video_url: url }))} accept="video" />
-              <Button onClick={add} disabled={adding} className="w-full bg-primary text-primary-foreground">{adding ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null} Add Work</Button>
+              <Button onClick={save} disabled={adding} className="w-full bg-primary text-primary-foreground">{adding ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null} {editId ? 'Save Changes' : 'Add Work'}</Button>
             </div>
           </DialogContent>
         </Dialog>
@@ -293,7 +363,10 @@ function WorksManager() {
                 <p className="text-xs text-muted-foreground">{w.category}</p>
                 {w.video_url && <p className="text-xs text-primary mt-0.5">▶ Video attached</p>}
               </div>
-              <Button size="sm" variant="outline" onClick={() => w.id && remove(w.id)} className="text-destructive border-destructive/30 shrink-0"><Trash2 className="h-3.5 w-3.5" /></Button>
+              <div className="flex items-center gap-2 shrink-0">
+                <Button size="sm" variant="outline" onClick={() => handleEdit(w)}><Edit className="h-3.5 w-3.5" /></Button>
+                <Button size="sm" variant="outline" onClick={() => w.id && remove(w.id)} className="text-destructive border-destructive/30"><Trash2 className="h-3.5 w-3.5" /></Button>
+              </div>
             </div>
           </div>
         ))}

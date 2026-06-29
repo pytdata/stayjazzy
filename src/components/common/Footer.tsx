@@ -24,6 +24,7 @@ export default function Footer() {
   const [submitting, setSubmitting] = useState(false)
   const [company, setCompany] = useState({
     logo_url: DEFAULT_LOGO,
+    footer_logo_height: 48,
     address: 'Accra, Ghana',
     phone: '+233 000 000 000',
     email: 'info@stayjazzy.com',
@@ -34,6 +35,7 @@ export default function Footer() {
       if (!settings) return
       setCompany(prev => ({
         logo_url: settings.logo_url || prev.logo_url,
+        footer_logo_height: settings.footer_logo_height || prev.footer_logo_height,
         address: settings.address || [settings.city, settings.country].filter(Boolean).join(', ') || prev.address,
         phone: settings.phone || prev.phone,
         email: settings.email || prev.email,
@@ -71,7 +73,8 @@ export default function Footer() {
           <img
             src={getImageUrl(company.logo_url)}
             alt="Stay Jazzy Multimedia"
-            className="h-12 w-auto object-contain mb-4 brightness-0 invert"
+            className="w-auto max-h-28 object-contain mb-4 brightness-0 invert"
+            style={{ height: company.footer_logo_height }}
           />
           <p className="text-sm text-white/70 leading-relaxed text-pretty">
             Stay Jazzy Multimedia — a multimedia firm established in 2012, specializing in business promotion, photography, videography, branding, and digital marketing.

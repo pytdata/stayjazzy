@@ -2,13 +2,17 @@ import express from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { query } from '../db.js';
-import nodemailer from 'nodemailer';
 import { ensureSchema } from '../schema.js';
+import { buildOtpEmail, sendEmail } from '../emailService.js';
 
 export const authRouter = express.Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_jwt_key_stayjazzy';
+const JWT_SECRET = process.env.JWT_SECRET || (process.env.NODE_ENV === 'production' ? '' : 'dev_only_jwt_secret_change_me');
 
-authRouter.post('/login', async (req, res) => {
+if (!JWT_SECRET) {
+  throw new Error('JWT_SECRET must be set in production');
+}
+
+authRouter.post('/login', async (req, res, next) => {
   try {
     const { email, password } = req.body;
     await ensureSchema();
@@ -28,17 +32,16 @@ authRouter.post('/login', async (req, res) => {
     
     res.json({ user: { id: admin.id, email: admin.email, role: admin.role }, token });
   } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({ error: 'Server error' });
+    next(error);
   }
 });
 
-authRouter.post('/reset-password-request', async (req, res) => {
+authRouter.post('/reset-password-request', async (req, res, next) => {
   try {
     const { email } = req.body;
     const result = await query('SELECT * FROM admins WHERE email = $1', [email]);
     if (result.rows.length === 0) {
-      return res.json({ success: true }); // pretend it sent
+      return res.json({ success: true });
     }
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
@@ -46,32 +49,19 @@ authRouter.post('/reset-password-request', async (req, res) => {
 
     await query('UPDATE admins SET reset_otp = $1, reset_otp_expires_at = $2 WHERE email = $3', [otp, expiresAt, email]);
 
-    // Send email
-    if (process.env.SMTP_USER) {
-      const transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST || 'smtp.gmail.com',
-        port: parseInt(process.env.SMTP_PORT || '587'),
-        secure: process.env.SMTP_SECURE === 'true',
-        auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
-      });
-      await transporter.sendMail({
-        from: `"Stay Jazzy" <${process.env.SMTP_USER}>`,
-        to: email,
-        subject: 'Password Reset OTP',
-        text: `Your OTP for password reset is: ${otp}`
-      });
-    } else {
-      console.log(`--- OTP MOCK EMAIL --- \nTo: ${email}\nOTP: ${otp}\n----------------------`);
-    }
+    const message = buildOtpEmail({ otp, purpose: 'admin password reset', expiresInMinutes: 15 });
+    await sendEmail({ to: email, ...message });
 
     res.json({ success: true });
   } catch (error) {
-    console.error('Reset request error:', error);
-    res.status(500).json({ error: 'Server error' });
+    if (error?.code === 'EMAIL_NOT_CONFIGURED') {
+      return res.status(503).json({ error: 'Email service is not configured. Please contact support.' });
+    }
+    next(error);
   }
 });
 
-authRouter.post('/reset-password-verify', async (req, res) => {
+authRouter.post('/reset-password-verify', async (req, res, next) => {
   try {
     const { email, otp, newPassword } = req.body;
     const result = await query('SELECT * FROM admins WHERE email = $1', [email]);
@@ -86,7 +76,6 @@ authRouter.post('/reset-password-verify', async (req, res) => {
 
     res.json({ success: true });
   } catch (error) {
-    console.error('Reset verify error:', error);
-    res.status(500).json({ error: 'Server error' });
+    next(error);
   }
 });

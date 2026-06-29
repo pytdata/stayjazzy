@@ -56,7 +56,7 @@ export default function BookingDashboardPage() {
   const [sending, setSending] = useState(false)
   const [cancelling, setCancelling] = useState(false)
   const [loading, setLoading] = useState(true)
-  const chatEndRef = useRef<HTMLDivElement>(null)
+  const chatScrollRef = useRef<HTMLDivElement>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // Auth guard
@@ -84,7 +84,8 @@ export default function BookingDashboardPage() {
   }, [id])
 
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    const chat = chatScrollRef.current
+    if (chat) chat.scrollTo({ top: chat.scrollHeight, behavior: 'smooth' })
   }, [messages])
 
   const handleSend = async (e: React.FormEvent) => {
@@ -222,7 +223,7 @@ export default function BookingDashboardPage() {
             </CardHeader>
 
             <CardContent className="flex-1 flex flex-col min-h-0">
-              <div className="flex-1 overflow-y-auto space-y-3 pr-1 mb-3 min-h-[200px] max-h-[300px]">
+              <div ref={chatScrollRef} className="flex-1 overflow-y-auto space-y-3 pr-1 mb-3 min-h-[200px] max-h-[300px]">
                 {messages.length === 0 ? (
                   <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
                     {canChat ? 'Start a conversation with our team!' : 'Chat is closed for this booking.'}
@@ -239,7 +240,6 @@ export default function BookingDashboardPage() {
                     </div>
                   ))
                 )}
-                <div ref={chatEndRef} />
               </div>
 
               {canChat ? (

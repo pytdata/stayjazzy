@@ -172,6 +172,27 @@ export interface NewsletterSubscriber {
   id: string
   email: string
   subscribed_at: string
+  is_subscribed?: boolean
+  unsubscribed_at?: string | null
+}
+
+export interface NewsletterRecipient {
+  id?: string
+  email: string
+  source: 'subscriber' | 'import' | 'manual'
+}
+
+export interface NewsletterImportResult {
+  recipients: NewsletterRecipient[]
+  count: number
+}
+
+export interface NewsletterPublishResult {
+  success: boolean
+  campaignId: string
+  sentCount: number
+  failedCount: number
+  results: Array<{ email: string; status: 'sent' | 'failed'; error?: string }>
 }
 
 export interface SiteContent {
@@ -336,6 +357,10 @@ export interface CompanySettings {
   bank_account_name: string | null
   bank_account_number: string | null
   logo_url: string | null
+  header_logo_height: number | null
+  menu_logo_height: number | null
+  footer_logo_height: number | null
+  admin_logo_height: number | null
   signature_urls: string[]
   primary_color: string
   secondary_color: string

@@ -7,7 +7,8 @@ import type {
   HeroSlide, ServicePackage, SubService, PricingTier, PricingFeature,
   PortfolioCategory, PortfolioWork, TeamMember, FAQ, ClientLogo, SiteContent,
   NewsletterSubscriber, ContactMessage, Booking, BookingStageRecord,
-  ChatMessage, BookingChatMessage, PageView,
+  ChatMessage, BookingChatMessage, PageView, NewsletterImportResult,
+  NewsletterPublishResult, NewsletterRecipient,
 } from '@/types/types'
 
 // ─── HERO SLIDES ─────────────────────────────────────────────
@@ -198,8 +199,33 @@ export async function subscribeNewsletter(email: string): Promise<{ alreadyExist
   return { alreadyExists: false }
 }
 export async function getNewsletterSubscribers(): Promise<NewsletterSubscriber[]> {
-  const { data } = await supabase.from('newsletter_subscribers').select('*').order('subscribed_at', { ascending: false })
+  const { data } = await supabase.from('newsletter_subscribers').select('*').eq('is_subscribed', true).order('subscribed_at', { ascending: false })
   return (data ?? []) as NewsletterSubscriber[]
+}
+export async function importNewsletterRecipients(url: string): Promise<NewsletterImportResult> {
+  const res = await fetch(`${API_BASE}/api/email/newsletter/import`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url }),
+  })
+  const data = await res.json()
+  if (!res.ok) throw new Error(data?.error || 'Failed to import recipients')
+  return data as NewsletterImportResult
+}
+export async function publishNewsletter(payload: {
+  subject: string
+  html: string
+  text?: string
+  recipients: NewsletterRecipient[]
+}): Promise<NewsletterPublishResult> {
+  const res = await fetch(`${API_BASE}/api/email/newsletter/publish`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  const data = await res.json()
+  if (!res.ok) throw new Error(data?.error || 'Failed to publish newsletter')
+  return data as NewsletterPublishResult
 }
 
 // ─── CONTACT MESSAGES ─────────────────────────────────────────
@@ -250,19 +276,9 @@ export async function getBookingById(id: string): Promise<Booking | null> {
 export async function createBooking(booking: Partial<Booking>): Promise<Booking> {
   const { data, error } = await supabase.from('bookings').insert(booking).single()
   if (error) throw error
-  
-  fetch(`${API_BASE}/api/email/send`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      to: booking.user_email,
-      subject: `Booking Confirmation - Stay Jazzy Multimedia`,
-      html: `<h2>Hello ${booking.user_name},</h2>
-             <p>Your booking for <strong>the selected services</strong> has been received.</p>
-             <p>We will contact you shortly.</p>`
-    })
-  }).catch(console.error)
-  
+
+  sendBookingConfirmationEmail(data as Booking).catch(console.error)
+
   return data as Booking
 }
 export async function updateBooking(id: string, update: Partial<Booking>) {
@@ -279,6 +295,24 @@ export async function getAllBookings(): Promise<Booking[]> {
 // ─── OTP ──────────────────────────────────────────────────────
 export function generateOTP(): string {
   return Math.floor(100000 + Math.random() * 900000).toString()
+}
+async function postEmail(path: string, payload: Record<string, unknown>) {
+  const response = await fetch(`${API_BASE}/api/email/${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  const body = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    throw new Error((body as { error?: string }).error || 'Email could not be sent')
+  }
+  return body
+}
+export async function sendOTPEmail(to: string, otp: string, purpose: string) {
+  return postEmail('otp', { to, otp, purpose, expiresInMinutes: 10 })
+}
+export async function sendBookingConfirmationEmail(booking: Booking) {
+  return postEmail('booking-confirmation', { booking })
 }
 export async function saveOTP(identifier: string, code: string) {
   await supabase.from('otps').delete().eq('identifier', identifier)

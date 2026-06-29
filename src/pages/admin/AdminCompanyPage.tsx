@@ -11,6 +11,21 @@ import { toast } from 'sonner'
 import MediaUpload from '@/components/ui/MediaUpload'
 import { getImageUrl } from '@/lib/mediaUrls'
 
+const LOGO_SIZE_FIELDS = [
+  { key: 'header_logo_height', label: 'Header Logo Height', min: 24, max: 96, placeholder: '48' },
+  { key: 'menu_logo_height', label: 'Mobile Menu Logo Height', min: 24, max: 120, placeholder: '48' },
+  { key: 'footer_logo_height', label: 'Footer Logo Height', min: 24, max: 120, placeholder: '48' },
+  { key: 'admin_logo_height', label: 'Admin/Splash Logo Height', min: 24, max: 120, placeholder: '40' },
+] as const
+
+const LOGO_SIZE_KEYS = LOGO_SIZE_FIELDS.map(field => field.key)
+
+const withoutLogoSizeFields = (payload: Partial<CompanySettings>) => {
+  const next = { ...payload }
+  for (const key of LOGO_SIZE_KEYS) delete next[key]
+  return next
+}
+
 export default function AdminCompanyPage() {
   const [settings, setSettings] = useState<CompanySettings | null>(null)
   const [form, setForm] = useState<Partial<CompanySettings>>({})
@@ -24,14 +39,35 @@ export default function AdminCompanyPage() {
     setForm(prev => ({ ...prev, [field]: value }))
   }
 
+  const handleNumberChange = (field: keyof CompanySettings, value: string) => {
+    handleChange(field, value === '' ? null : Number(value))
+  }
+
   const save = async () => {
     if (!settings) return
     setLoading(true)
-    await updateCompanySettings(settings.id, form)
-    setLoading(false)
-    toast.success('Company settings saved')
-    const updated = await getCompanySettings()
-    setSettings(updated); if (updated) setForm(updated)
+    try {
+      await updateCompanySettings(settings.id, form)
+      toast.success('Company settings saved')
+      const updated = await getCompanySettings()
+      setSettings(updated); if (updated) setForm(updated)
+    } catch (error) {
+      const message = error && typeof error === 'object' && 'message' in error ? String(error.message) : ''
+      if (LOGO_SIZE_KEYS.some(key => message.includes(key))) {
+        try {
+          await updateCompanySettings(settings.id, withoutLogoSizeFields(form))
+          toast.warning('Company settings saved, but logo sizing columns are not available yet')
+          const updated = await getCompanySettings()
+          setSettings(updated); if (updated) setForm(updated)
+        } catch {
+          toast.error('Failed to save company settings')
+        }
+      } else {
+        toast.error('Failed to save company settings')
+      }
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -91,6 +127,21 @@ export default function AdminCompanyPage() {
             <div className="space-y-1">
               <Label>Logo</Label>
               <MediaUpload value={form.logo_url} onChange={url => handleChange('logo_url', url)} accept="image" />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {LOGO_SIZE_FIELDS.map(field => (
+                <div key={field.key} className="space-y-1">
+                  <Label>{field.label} (px)</Label>
+                  <Input
+                    type="number"
+                    min={field.min}
+                    max={field.max}
+                    value={form[field.key] ?? ''}
+                    onChange={e => handleNumberChange(field.key, e.target.value)}
+                    placeholder={field.placeholder}
+                  />
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>

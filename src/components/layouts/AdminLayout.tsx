@@ -32,10 +32,12 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
   const { admin, signOut } = useAuth()
   const navigate = useNavigate()
   const [logoUrl, setLogoUrl] = useState(DEFAULT_LOGO)
+  const [adminLogoHeight, setAdminLogoHeight] = useState(40)
 
   useEffect(() => {
     getCompanySettings().then(settings => {
       if (settings?.logo_url) setLogoUrl(settings.logo_url)
+      if (settings?.admin_logo_height) setAdminLogoHeight(settings.admin_logo_height)
     })
   }, [])
 
@@ -51,7 +53,8 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
         <img
           src={getImageUrl(logoUrl)}
           alt="Stay Jazzy"
-          className="h-10 w-auto object-contain brightness-0 invert mb-2"
+          className="w-auto max-h-28 object-contain brightness-0 invert mb-2"
+          style={{ height: adminLogoHeight }}
         />
         <p className="text-xs text-sidebar-foreground/60">Admin Dashboard</p>
       </div>

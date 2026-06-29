@@ -140,6 +140,32 @@ CREATE TABLE IF NOT EXISTS newsletter_subscribers (
   email TEXT UNIQUE NOT NULL,
   subscribed_at TIMESTAMPTZ DEFAULT NOW()
 );
+ALTER TABLE newsletter_subscribers ADD COLUMN IF NOT EXISTS is_subscribed BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE newsletter_subscribers ADD COLUMN IF NOT EXISTS unsubscribed_at TIMESTAMPTZ;
+
+CREATE TABLE IF NOT EXISTS newsletter_campaigns (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  subject TEXT NOT NULL,
+  html TEXT NOT NULL,
+  text TEXT,
+  recipient_count INTEGER DEFAULT 0,
+  sent_count INTEGER DEFAULT 0,
+  failed_count INTEGER DEFAULT 0,
+  status TEXT DEFAULT 'draft',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  sent_at TIMESTAMPTZ
+);
+
+CREATE TABLE IF NOT EXISTS newsletter_sends (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  campaign_id UUID REFERENCES newsletter_campaigns(id) ON DELETE CASCADE,
+  recipient_email TEXT NOT NULL,
+  recipient_source TEXT DEFAULT 'subscriber',
+  status TEXT DEFAULT 'pending',
+  message_id TEXT,
+  error TEXT,
+  sent_at TIMESTAMPTZ DEFAULT NOW()
+);
 
 CREATE TABLE IF NOT EXISTS contact_messages (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -332,12 +358,20 @@ CREATE TABLE IF NOT EXISTS company_settings (
   bank_account_name TEXT,
   bank_account_number TEXT,
   logo_url TEXT,
+  header_logo_height INTEGER DEFAULT 48,
+  menu_logo_height INTEGER DEFAULT 48,
+  footer_logo_height INTEGER DEFAULT 48,
+  admin_logo_height INTEGER DEFAULT 40,
   signature_urls JSONB DEFAULT '[]'::jsonb,
   primary_color TEXT DEFAULT '#000000',
   secondary_color TEXT DEFAULT '#ffffff',
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS header_logo_height INTEGER DEFAULT 48;
+ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS menu_logo_height INTEGER DEFAULT 48;
+ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS footer_logo_height INTEGER DEFAULT 48;
+ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS admin_logo_height INTEGER DEFAULT 40;
 
 CREATE TABLE IF NOT EXISTS seo_settings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -364,6 +398,8 @@ CREATE INDEX IF NOT EXISTS idx_chat_messages_booking ON chat_messages(booking_id
 CREATE INDEX IF NOT EXISTS idx_booking_stages_booking ON booking_stages(booking_id);
 CREATE INDEX IF NOT EXISTS idx_page_views_created ON page_views(created_at);
 CREATE INDEX IF NOT EXISTS idx_otps_identifier ON otps(identifier);
+CREATE INDEX IF NOT EXISTS idx_newsletter_sends_campaign ON newsletter_sends(campaign_id);
+CREATE INDEX IF NOT EXISTS idx_newsletter_subscribers_active ON newsletter_subscribers(is_subscribed);
 `
 
 const ADMIN_USERS = [

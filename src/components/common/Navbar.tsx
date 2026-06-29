@@ -28,6 +28,8 @@ export default function Navbar() {
   const { t } = useLanguage()
   const isHome = location.pathname === '/'
   const [logoUrl, setLogoUrl] = useState(DEFAULT_LOGO)
+  const [headerLogoHeight, setHeaderLogoHeight] = useState(48)
+  const [menuLogoHeight, setMenuLogoHeight] = useState(48)
 
   useEffect(() => {
     const handler = () => setScrolled(window.scrollY > 60)
@@ -40,6 +42,8 @@ export default function Navbar() {
   useEffect(() => {
     getCompanySettings().then(settings => {
       if (settings?.logo_url) setLogoUrl(settings.logo_url)
+      if (settings?.header_logo_height) setHeaderLogoHeight(settings.header_logo_height)
+      if (settings?.menu_logo_height) setMenuLogoHeight(settings.menu_logo_height)
     })
   }, [])
 
@@ -59,7 +63,8 @@ export default function Navbar() {
             <img
               src={getImageUrl(logoUrl)}
               alt="Stay Jazzy Multimedia"
-              className="h-10 md:h-12 w-auto object-contain"
+              className="w-auto max-h-16 md:max-h-20 object-contain"
+              style={{ height: headerLogoHeight }}
             />
           </Link>
 
@@ -135,6 +140,14 @@ export default function Navbar() {
             className="absolute top-0 right-0 h-full w-72 bg-white shadow-2xl flex flex-col pt-20 pb-6 px-6"
             onClick={e => e.stopPropagation()}
           >
+            <Link to="/" className="mb-4">
+              <img
+                src={getImageUrl(logoUrl)}
+                alt="Stay Jazzy Multimedia"
+                className="w-auto max-h-24 object-contain"
+                style={{ height: menuLogoHeight }}
+              />
+            </Link>
             {NAV_KEYS.map(link => (
               <Link
                 key={link.path}

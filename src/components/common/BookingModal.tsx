@@ -5,16 +5,13 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useBooking } from '@/contexts/BookingContext'
-import { createBooking, getBookingByEmailPhone, saveOTP, verifyOTP } from '@/db/api'
+import { createBooking, generateOTP, getBookingByEmailPhone, saveOTP, sendOTPEmail, verifyOTP } from '@/db/api'
 import { toast } from 'sonner'
 import { CheckCircle, Loader2 } from 'lucide-react'
 
 type Step = 'info' | 'otp' | 'done'
 
 interface BookingModalProps { open: boolean; onClose: () => void }
-
-// Simple 6-digit OTP generator
-function generateOTP() { return Math.floor(100000 + Math.random() * 900000).toString() }
 
 export default function BookingModal({ open, onClose }: BookingModalProps) {
   const { selectedServices, clearServices, setCurrentBookingId, setBookingToken } = useBooking()
@@ -26,7 +23,6 @@ export default function BookingModal({ open, onClose }: BookingModalProps) {
   const [otp, setOtp] = useState('')
   const [loading, setLoading] = useState(false)
   const [bookingId, setBookingId] = useState<string | null>(null)
-  const [shownOtp, setShownOtp] = useState<string | null>(null)
 
   const handleInfoSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -43,11 +39,11 @@ export default function BookingModal({ open, onClose }: BookingModalProps) {
       }
       setBookingId(bid)
       const code = generateOTP()
-      setShownOtp(code) // In production, send via SMS/email; here we show it
       await saveOTP(email.trim(), code)
-      toast.success(`OTP sent! (Demo: ${code})`)
+      await sendOTPEmail(email.trim(), code, 'booking verification')
+      toast.success('OTP sent to your email.')
       setStep('otp')
-    } catch { toast.error('Something went wrong. Please try again.') }
+    } catch (error) { toast.error(error instanceof Error ? error.message : 'Something went wrong. Please try again.') }
     finally { setLoading(false) }
   }
 
@@ -67,7 +63,7 @@ export default function BookingModal({ open, onClose }: BookingModalProps) {
     finally { setLoading(false) }
   }
 
-  const resetState = () => { setStep('info'); setEmail(''); setPhone(''); setName(''); setOtp(''); setBookingId(null); setShownOtp(null) }
+  const resetState = () => { setStep('info'); setEmail(''); setPhone(''); setName(''); setOtp(''); setBookingId(null) }
   const handleClose = () => { resetState(); onClose() }
 
   return (
@@ -76,7 +72,7 @@ export default function BookingModal({ open, onClose }: BookingModalProps) {
         <DialogHeader>
           <DialogTitle>
             {step === 'info' && 'Book Appointment'}
-            {step === 'otp' && 'Verify Your Phone'}
+            {step === 'otp' && 'Verify Your Email'}
             {step === 'done' && 'Booking Confirmed!'}
           </DialogTitle>
         </DialogHeader>
@@ -113,8 +109,7 @@ export default function BookingModal({ open, onClose }: BookingModalProps) {
         {step === 'otp' && (
           <form onSubmit={handleOtpSubmit} className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              An OTP has been sent to <strong>{phone}</strong>.
-              {shownOtp && <span className="block mt-1 text-primary font-bold text-lg">Demo OTP: {shownOtp}</span>}
+              An OTP has been sent to <strong>{email}</strong>.
             </p>
             <div className="space-y-1">
               <Label htmlFor="bk-otp">Enter 6-digit OTP</Label>
