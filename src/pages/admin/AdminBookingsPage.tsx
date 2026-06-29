@@ -29,16 +29,41 @@ function PaymentRequestDialog({
 }: { booking: Booking; open: boolean; onClose: () => void }) {
   const [percentage, setPercentage] = useState('')
   const [stageName, setStageName] = useState('')
-  const [totalAmount, setTotalAmount] = useState('')
+  const [extraCost, setExtraCost] = useState('')
   const [loading, setLoading] = useState(false)
 
-  const computedAmount = totalAmount && percentage
-    ? ((Number(totalAmount) * Number(percentage)) / 100).toFixed(2)
+  const baseAmount = (booking.selected_services || []).reduce((sum, service) => sum + Number(service.price || 0), 0)
+  const extraAmount = Number(extraCost || 0)
+  const totalAmount = baseAmount + (Number.isFinite(extraAmount) ? extraAmount : 0)
+  const percentageAmount = Number(percentage)
+  const computedAmount = totalAmount > 0 && Number.isFinite(percentageAmount) && percentageAmount > 0
+    ? ((totalAmount * percentageAmount) / 100).toFixed(2)
     : ''
 
+  useEffect(() => {
+    if (!open) return
+    setPercentage('')
+    setStageName('')
+    setExtraCost('')
+  }, [open, booking.id])
+
   const handleSubmit = async () => {
-    if (!percentage || !stageName || !totalAmount) {
-      toast.error('Please fill all fields')
+    const percent = Number(percentage)
+    const extras = Number(extraCost || 0)
+    if (!percentage || !stageName) {
+      toast.error('Please select a stage and percentage')
+      return
+    }
+    if (!Number.isFinite(percent) || percent <= 0 || percent > 100) {
+      toast.error('Percentage must be between 1 and 100')
+      return
+    }
+    if (!Number.isFinite(extras) || extras < 0) {
+      toast.error('Extra costs cannot be negative')
+      return
+    }
+    if (totalAmount <= 0) {
+      toast.error('This booking has no project value yet')
       return
     }
     setLoading(true)
@@ -66,7 +91,7 @@ function PaymentRequestDialog({
         total: amount,
         currency: 'GHS',
         status: 'sent',
-        notes: `Payment request for stage: ${stageName} (${percentage}% of GHS ${totalAmount})`,
+        notes: `Payment request for stage: ${stageName} (${percentage}% of GHS ${totalAmount.toFixed(2)}; base: GHS ${baseAmount.toFixed(2)}, extra costs: GHS ${extras.toFixed(2)})`,
       })
 
       toast.success(`Payment request of GHS ${amount.toLocaleString()} sent to client`)
@@ -97,12 +122,31 @@ function PaymentRequestDialog({
             </Select>
           </div>
           <div className="space-y-1">
-            <Label>Total Project Value (GHS)</Label>
+            <Label>Initial Project Value (GHS)</Label>
+            <Input
+              value={baseAmount.toLocaleString()}
+              readOnly
+              className="bg-muted/60 cursor-not-allowed"
+            />
+            <p className="text-xs text-muted-foreground">Calculated from the services selected by the customer.</p>
+          </div>
+          <div className="space-y-1">
+            <Label>Extra Costs (GHS)</Label>
             <Input
               type="number"
-              placeholder="e.g. 5000"
-              value={totalAmount}
-              onChange={e => setTotalAmount(e.target.value)}
+              min="0"
+              step="0.01"
+              placeholder="e.g. 500"
+              value={extraCost}
+              onChange={e => setExtraCost(e.target.value)}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label>Total Project Value (GHS)</Label>
+            <Input
+              value={totalAmount.toLocaleString()}
+              readOnly
+              className="bg-muted/60 cursor-not-allowed font-semibold"
             />
           </div>
           <div className="space-y-1">
