@@ -35,7 +35,6 @@ const SERVICES_PREVIEW = [
 export default function HomePage() {
   const [slides, setSlides] = useState<Partial<HeroSlide>[]>(DEFAULT_SLIDES)
   const [current, setCurrent] = useState(0)
-  const [fading, setFading] = useState(false)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const aboutRef = useRef<HTMLDivElement>(null)
 
@@ -44,9 +43,17 @@ export default function HomePage() {
     getHeroSlides().then(data => { if (data.length > 0) setSlides(data) })
   }, [])
 
+  useEffect(() => {
+    slides.forEach(slide => {
+      const url = getImageUrl(slide?.image_url)
+      if (!url) return
+      const image = new Image()
+      image.src = url
+    })
+  }, [slides])
+
   const goTo = useCallback((idx: number) => {
-    setFading(true)
-    setTimeout(() => { setCurrent(idx); setFading(false) }, 300)
+    setCurrent(idx)
   }, [])
 
   const next = useCallback(() => goTo((current + 1) % slides.length), [current, slides.length, goTo])
@@ -65,15 +72,20 @@ export default function HomePage() {
       <section className="relative w-full h-screen min-h-[560px] overflow-hidden">
         <SocialSidebar />
         {/* Background */}
-        <div
-          className={`absolute inset-0 bg-cover bg-center transition-opacity duration-500 ${fading ? 'opacity-0' : 'opacity-100'}`}
-          style={{ backgroundImage: `url(${getImageUrl(slide?.image_url)})` }}
-        />
+        <div className="absolute inset-0 bg-black">
+          {slides.map((item, index) => (
+            <div
+              key={item.id || index}
+              className={`absolute inset-0 bg-cover bg-center transition-opacity duration-1000 ease-in-out ${index === current ? 'opacity-100' : 'opacity-0'}`}
+              style={{ backgroundImage: `url(${getImageUrl(item?.image_url)})` }}
+            />
+          ))}
+        </div>
         <div className="hero-overlay absolute inset-0" />
 
         {/* Content */}
         <div className="relative z-10 flex flex-col items-center justify-center h-full text-white text-center px-4">
-          <div className={`transition-all duration-500 ${fading ? 'opacity-0 translate-y-4' : 'opacity-100 translate-y-0'}`}>
+          <div className="transition-all duration-500 opacity-100 translate-y-0">
             <p className="text-xs md:text-sm font-semibold uppercase tracking-[0.3em] text-white/70 mb-4">Stay Jazzy Multimedia</p>
             <h1 className="text-3xl md:text-5xl lg:text-6xl font-bold leading-tight mb-4 text-balance" style={{ whiteSpace: 'pre-line' }}>
               {slide?.title || 'Capturing Moments,\nCreating Memories'}
