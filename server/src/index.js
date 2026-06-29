@@ -13,12 +13,14 @@ import app, { ensureSchema } from './app.js'
 
 const httpServer = createServer(app)
 const configuredOrigins = (process.env.ALLOWED_ORIGIN || '')
-  .split(',')
+  .split(/[\s,;]+/)
   .map(origin => origin.trim())
   .filter(Boolean)
 const allowedOrigins = [
   'https://stayjazzy.vercel.app',
   'https://stayjazzy-backend.vercel.app',
+  'https://stayjazzymultimedia.com',
+  'https://www.stayjazzymultimedia.com',
   'https://stajazzymultimedia.com',
   'https://www.stajazzymultimedia.com',
   'http://localhost:5173',
