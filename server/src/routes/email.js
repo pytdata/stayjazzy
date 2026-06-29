@@ -8,6 +8,7 @@ import {
   assertEmailConfigured,
   buildBookingConfirmationEmail,
   buildOtpEmail,
+  buildPaymentRequestEmail,
   describeEmailError,
   getEmailDiagnostics,
   sendEmail as sendSmtpEmail,
@@ -231,6 +232,18 @@ emailRouter.post('/booking-confirmation', async (req, res) => {
     const { booking } = req.body;
     const message = buildBookingConfirmationEmail({ booking });
     const info = await deliverEmail({ to: booking?.user_email, ...message });
+    res.json({ success: true, messageId: info.messageId });
+  } catch (error) {
+    handleEmailError(error, res);
+  }
+});
+
+emailRouter.post('/payment-request', async (req, res) => {
+  try {
+    const { booking, paymentRequest, invoice, dashboardUrl } = req.body;
+    const recipient = booking?.user_email || invoice?.customer_email;
+    const message = buildPaymentRequestEmail({ booking, paymentRequest, invoice, dashboardUrl });
+    const info = await deliverEmail({ to: recipient, ...message });
     res.json({ success: true, messageId: info.messageId });
   } catch (error) {
     handleEmailError(error, res);

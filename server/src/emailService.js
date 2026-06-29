@@ -208,6 +208,104 @@ export function buildBookingConfirmationEmail({ booking }) {
   };
 }
 
+const PAYMENT_METHOD_LABELS = {
+  paystack: 'Paystack Online Payment',
+  cash: 'In-Person Cash',
+  bank_transfer: 'Bank Transfer',
+  momo_merchant: 'Merchant MoMo',
+};
+
+function renderPaymentInstructions({ paymentRequest, invoice, dashboardUrl }) {
+  const method = paymentRequest?.payment_method || invoice?.payment_method || 'paystack';
+  const details = invoice?.payment_details && typeof invoice.payment_details === 'object' ? invoice.payment_details : {};
+  const instructions = paymentRequest?.offline_instructions || details.offline_instructions || '';
+
+  if (method === 'bank_transfer') {
+    return `<div style="background:#fbf9f5;border:1px solid #eee5d8;border-radius:12px;padding:16px;margin-top:16px;">
+      <div style="font-weight:800;color:#201c18;margin-bottom:10px;">Bank transfer details</div>
+      ${details.bank_name ? `<p style="margin:0 0 6px;"><strong>Bank:</strong> ${escapeHtml(details.bank_name)}</p>` : ''}
+      ${details.bank_account_name ? `<p style="margin:0 0 6px;"><strong>Account name:</strong> ${escapeHtml(details.bank_account_name)}</p>` : ''}
+      ${details.bank_account_number ? `<p style="margin:0 0 6px;"><strong>Account number:</strong> ${escapeHtml(details.bank_account_number)}</p>` : ''}
+      ${instructions ? `<p style="margin:10px 0 0;color:#74695d;">${escapeHtml(instructions)}</p>` : ''}
+    </div>`;
+  }
+
+  if (method === 'momo_merchant') {
+    return `<div style="background:#fbf9f5;border:1px solid #eee5d8;border-radius:12px;padding:16px;margin-top:16px;">
+      <div style="font-weight:800;color:#201c18;margin-bottom:10px;">Merchant MoMo details</div>
+      ${details.merchant_momo_name ? `<p style="margin:0 0 6px;"><strong>Merchant name:</strong> ${escapeHtml(details.merchant_momo_name)}</p>` : ''}
+      ${details.merchant_momo_number ? `<p style="margin:0 0 6px;"><strong>Merchant number:</strong> ${escapeHtml(details.merchant_momo_number)}</p>` : ''}
+      ${instructions ? `<p style="margin:10px 0 0;color:#74695d;">${escapeHtml(instructions)}</p>` : ''}
+    </div>`;
+  }
+
+  if (method === 'cash') {
+    return `<div style="background:#fbf9f5;border:1px solid #eee5d8;border-radius:12px;padding:16px;margin-top:16px;">
+      <div style="font-weight:800;color:#201c18;margin-bottom:10px;">Cash payment</div>
+      <p style="margin:0;">Please make payment in person to Stay Jazzy Multimedia or an authorized team member.</p>
+      ${instructions ? `<p style="margin:10px 0 0;color:#74695d;">${escapeHtml(instructions)}</p>` : ''}
+    </div>`;
+  }
+
+  return `<div style="margin-top:18px;text-align:center;">
+    <a href="${escapeHtml(dashboardUrl || '#')}" style="display:inline-block;background:#650029;color:#ffffff;text-decoration:none;border-radius:10px;padding:12px 18px;font-weight:800;">Open Booking Dashboard to Pay</a>
+  </div>`;
+}
+
+export function buildPaymentRequestEmail({ booking, paymentRequest, invoice, dashboardUrl }) {
+  const name = booking?.user_name ? escapeHtml(booking.user_name) : 'there';
+  const amount = Number(paymentRequest?.amount || invoice?.total || 0);
+  const currency = paymentRequest?.currency || invoice?.currency || 'GHS';
+  const method = paymentRequest?.payment_method || invoice?.payment_method || 'paystack';
+  const methodLabel = PAYMENT_METHOD_LABELS[method] || 'Payment';
+  const details = invoice?.payment_details && typeof invoice.payment_details === 'object' ? invoice.payment_details : {};
+  const bookingRef = String(booking?.id || invoice?.booking_id || paymentRequest?.booking_id || '').slice(0, 8).toUpperCase();
+  const invoiceRef = invoice?.invoice_number || String(invoice?.id || '').slice(0, 8).toUpperCase();
+
+  const html = renderLayout({
+    preheader: `New invoice payment request: ${currency} ${amount.toLocaleString()}.`,
+    title: 'Invoice Payment Request',
+    intro: `Hi ${name}, an invoice has been generated for your Stay Jazzy Multimedia booking.`,
+    body: `<div style="background:#f8f1df;border:1px solid #ead8aa;border-radius:12px;padding:18px;">
+      <p style="margin:0 0 8px;color:#74695d;font-size:13px;">Booking reference</p>
+      <p style="margin:0 0 14px;font-size:18px;font-weight:800;color:#201c18;">${escapeHtml(bookingRef)}</p>
+      ${invoiceRef ? `<p style="margin:0 0 8px;color:#74695d;font-size:13px;">Invoice</p><p style="margin:0 0 14px;font-weight:700;color:#201c18;">${escapeHtml(invoiceRef)}</p>` : ''}
+      <p style="margin:0 0 8px;color:#74695d;font-size:13px;">Project stage</p>
+      <p style="margin:0 0 14px;font-weight:700;color:#201c18;">${escapeHtml(paymentRequest?.stage_name || 'Payment request')}</p>
+      <p style="margin:0 0 8px;color:#74695d;font-size:13px;">Amount due</p>
+      <p style="margin:0 0 14px;font-size:24px;font-weight:900;color:#650029;">${escapeHtml(currency)} ${amount.toLocaleString()}</p>
+      <p style="margin:0;color:#74695d;font-size:13px;">Payment mode</p>
+      <p style="margin:4px 0 0;font-weight:700;color:#201c18;">${escapeHtml(methodLabel)}</p>
+    </div>
+    ${renderPaymentInstructions({ paymentRequest, invoice, dashboardUrl })}`,
+    footer: method === 'paystack'
+      ? 'Use your booking dashboard to complete online payment securely.'
+      : 'After making payment, our admin team will confirm and update your booking payment status.',
+  });
+
+  const text = [
+    `Invoice payment request from ${BRAND_NAME}`,
+    `Booking: ${bookingRef}`,
+    invoiceRef ? `Invoice: ${invoiceRef}` : '',
+    `Stage: ${paymentRequest?.stage_name || 'Payment request'}`,
+    `Amount due: ${currency} ${amount.toLocaleString()}`,
+    `Payment mode: ${methodLabel}`,
+    dashboardUrl && method === 'paystack' ? `Pay online: ${dashboardUrl}` : '',
+    method === 'bank_transfer' && details.bank_name ? `Bank: ${details.bank_name}` : '',
+    method === 'bank_transfer' && details.bank_account_name ? `Account name: ${details.bank_account_name}` : '',
+    method === 'bank_transfer' && details.bank_account_number ? `Account number: ${details.bank_account_number}` : '',
+    method === 'momo_merchant' && details.merchant_momo_name ? `Merchant name: ${details.merchant_momo_name}` : '',
+    method === 'momo_merchant' && details.merchant_momo_number ? `Merchant number: ${details.merchant_momo_number}` : '',
+    paymentRequest?.offline_instructions ? `Instructions: ${paymentRequest.offline_instructions}` : '',
+  ].filter(Boolean).join('\n');
+
+  return {
+    subject: `${BRAND_NAME} invoice payment request`,
+    text,
+    html,
+  };
+}
+
 export function buildContactMessageEmail({ message }) {
   const html = renderLayout({
     preheader: `New contact message from ${message?.name || 'website visitor'}.`,

@@ -8,7 +8,7 @@ import type {
   PortfolioCategory, PortfolioWork, TeamMember, FAQ, ClientLogo, SiteContent,
   NewsletterSubscriber, ContactMessage, Booking, BookingStageRecord,
   ChatMessage, BookingChatMessage, PageView, NewsletterImportResult,
-  NewsletterPublishResult, NewsletterRecipient,
+  NewsletterPublishResult, NewsletterRecipient, PaymentRequest, Invoice,
 } from '@/types/types'
 
 // ─── HERO SLIDES ─────────────────────────────────────────────
@@ -314,6 +314,14 @@ export async function sendOTPEmail(to: string, otp: string, purpose: string) {
 }
 export async function sendBookingConfirmationEmail(booking: Booking) {
   return postEmail('booking-confirmation', { booking })
+}
+export async function sendPaymentRequestEmail(payload: {
+  booking: Booking
+  paymentRequest: PaymentRequest
+  invoice: Invoice
+  dashboardUrl: string
+}) {
+  return postEmail('payment-request', payload)
 }
 export async function saveOTP(identifier: string, code: string) {
   await supabase.from('otps').delete().eq('identifier', identifier)

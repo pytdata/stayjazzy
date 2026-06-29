@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog'
-import { getAllBookings, getBookingStages, getChatMessages, sendChatMessageObj as sendChatMessage, updateBookingStage, createBookingStage, createPaymentRequest, createInvoice, getCompanySettings } from '@/db/api'
+import { getAllBookings, getBookingStages, getChatMessages, sendChatMessageObj as sendChatMessage, updateBookingStage, createBookingStage, createPaymentRequest, createInvoice, getCompanySettings, sendPaymentRequestEmail } from '@/db/api'
 import type { Booking, BookingChatMessage, BookingStageRecord as BookingStage, CompanySettings, PaymentRequest } from '@/types/types'
 import { toast } from 'sonner'
 import { MessageCircle, Send, ChevronDown, ChevronUp, Loader2, CreditCard } from 'lucide-react'
@@ -97,7 +97,7 @@ function PaymentRequestDialog({
         offline_instructions: offlineInstructions.trim(),
       }
       // 1. Create payment request record
-      await createPaymentRequest({
+      const paymentRequest = await createPaymentRequest({
         booking_id: booking.id,
         stage_name: stageName,
         percentage: Number(percentage),
@@ -109,7 +109,7 @@ function PaymentRequestDialog({
       })
 
       // 2. Create invoice
-      await createInvoice({
+      const invoice = await createInvoice({
         booking_id: booking.id,
         customer_name: booking.user_name || booking.user_email,
         customer_email: booking.user_email,
@@ -125,7 +125,17 @@ function PaymentRequestDialog({
         notes: `Payment request for stage: ${stageName} (${percentage}% of GHS ${totalAmount.toFixed(2)}; base: GHS ${baseAmount.toFixed(2)}, extra costs: GHS ${extras.toFixed(2)}; method: ${paymentMethod})`,
       })
 
-      toast.success(`Payment request of GHS ${amount.toLocaleString()} sent to client`)
+      try {
+        await sendPaymentRequestEmail({
+          booking,
+          paymentRequest,
+          invoice,
+          dashboardUrl: `${window.location.origin}/check-booking`,
+        })
+        toast.success(`Payment request of GHS ${amount.toLocaleString()} sent to client`)
+      } catch (emailError: any) {
+        toast.warning(`Payment request created, but email was not sent. ${emailError.message || ''}`)
+      }
       onClose()
     } catch (e: any) {
       toast.error(e.message || 'Failed to create payment request')
