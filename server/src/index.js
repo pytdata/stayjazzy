@@ -28,9 +28,26 @@ const allowedOrigins = [
   'http://localhost:4000',
   ...configuredOrigins,
 ].filter(origin => origin !== '*')
+const ALLOWED_HOST_SUFFIXES = [
+  'stayjazzymultimedia.com',
+  'stajazzymultimedia.com',
+]
+
+const isAllowedOrigin = (origin) => {
+  if (!origin) return true
+  if (allowedOrigins.includes(origin)) return true
+  try {
+    const url = new URL(origin)
+    return url.protocol === 'https:' && ALLOWED_HOST_SUFFIXES.some(host => (
+      url.hostname === host || url.hostname.endsWith(`.${host}`)
+    ))
+  } catch {
+    return false
+  }
+}
 
 const socketCorsOrigin = (origin, callback) => {
-  if (!origin || allowedOrigins.includes(origin)) {
+  if (isAllowedOrigin(origin)) {
     callback(null, true)
     return
   }

@@ -44,9 +44,26 @@ const configuredOrigins = (process.env.ALLOWED_ORIGIN || '')
   .filter(Boolean)
 
 const allowedOrigins = new Set([...DEFAULT_ALLOWED_ORIGINS, ...configuredOrigins])
+const ALLOWED_HOST_SUFFIXES = [
+  'stayjazzymultimedia.com',
+  'stajazzymultimedia.com',
+]
+
+const isAllowedOrigin = (origin) => {
+  if (!origin) return true
+  if (allowedOrigins.has(origin)) return true
+  try {
+    const url = new URL(origin)
+    return url.protocol === 'https:' && ALLOWED_HOST_SUFFIXES.some(host => (
+      url.hostname === host || url.hostname.endsWith(`.${host}`)
+    ))
+  } catch {
+    return false
+  }
+}
 
 const corsOrigin = (origin, callback) => {
-  if (!origin || allowedOrigins.has(origin)) {
+  if (isAllowedOrigin(origin)) {
     callback(null, true)
     return
   }
