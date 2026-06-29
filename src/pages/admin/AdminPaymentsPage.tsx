@@ -21,6 +21,7 @@ const PAYMENT_METHOD_LABELS: Record<PaymentRequest['payment_method'], string> = 
   bank_transfer: 'Bank',
   momo_merchant: 'Merchant MoMo',
 }
+const isManualPayment = (request: PaymentRequest) => request.payment_method !== 'paystack'
 
 export default function AdminPaymentsPage() {
   const [activeTab, setActiveTab] = useState('transactions')
@@ -51,6 +52,10 @@ export default function AdminPaymentsPage() {
     )
 
   const markRequestPaid = async (request: PaymentRequest) => {
+    if (!isManualPayment(request)) {
+      toast.error('Paystack payment status is updated automatically after verification')
+      return
+    }
     try {
       const invoice = findInvoiceForRequest(request)
       await updatePaymentRequest(request.id, { status: 'paid' })
@@ -75,6 +80,10 @@ export default function AdminPaymentsPage() {
   }
 
   const cancelRequest = async (request: PaymentRequest) => {
+    if (!isManualPayment(request)) {
+      toast.error('Paystack payment status cannot be edited manually')
+      return
+    }
     try {
       await updatePaymentRequest(request.id, { status: 'cancelled' })
       toast.success('Payment request cancelled')
@@ -171,31 +180,38 @@ export default function AdminPaymentsPage() {
               <table className="w-full text-sm">
                 <thead className="border-b"><tr className="text-left"><th>Booking</th><th>Stage</th><th>Mode</th><th>Percentage</th><th>Amount</th><th>Status</th><th>Due</th><th>Actions</th></tr></thead>
                 <tbody className="divide-y">
-                  {requests.map(r => (
-                    <tr key={r.id}>
-                      <td className="py-2">{r.booking_id.slice(0, 8)}...</td>
-                      <td className="py-2">{r.stage_name}</td>
-                      <td className="py-2">{PAYMENT_METHOD_LABELS[r.payment_method] || r.payment_method}</td>
-                      <td className="py-2">{r.percentage}%</td>
-                      <td className="py-2 font-semibold">GHS {Number(r.amount).toLocaleString()}</td>
-                      <td className="py-2"><Badge variant={r.status === 'paid' ? 'default' : r.status === 'pending' ? 'secondary' : 'destructive'}>{r.status}</Badge></td>
-                      <td className="py-2 text-muted-foreground">{r.due_date ? new Date(r.due_date).toLocaleDateString() : '-'}</td>
-                      <td className="py-2">
-                        <div className="flex gap-2">
-                          {r.status !== 'paid' && (
-                            <Button size="sm" variant="outline" onClick={() => markRequestPaid(r)}>
-                              Mark Paid
-                            </Button>
+                  {requests.map(r => {
+                    const manual = isManualPayment(r)
+                    return (
+                      <tr key={r.id}>
+                        <td className="py-2">{r.booking_id.slice(0, 8)}...</td>
+                        <td className="py-2">{r.stage_name}</td>
+                        <td className="py-2">{PAYMENT_METHOD_LABELS[r.payment_method] || r.payment_method}</td>
+                        <td className="py-2">{r.percentage}%</td>
+                        <td className="py-2 font-semibold">GHS {Number(r.amount).toLocaleString()}</td>
+                        <td className="py-2"><Badge variant={r.status === 'paid' ? 'default' : r.status === 'pending' ? 'secondary' : 'destructive'}>{r.status}</Badge></td>
+                        <td className="py-2 text-muted-foreground">{r.due_date ? new Date(r.due_date).toLocaleDateString() : '-'}</td>
+                        <td className="py-2">
+                          {manual ? (
+                            <div className="flex gap-2">
+                              {r.status !== 'paid' && (
+                                <Button size="sm" variant="outline" onClick={() => markRequestPaid(r)}>
+                                  Mark Paid
+                                </Button>
+                              )}
+                              {r.status === 'pending' && (
+                                <Button size="sm" variant="ghost" className="text-destructive" onClick={() => cancelRequest(r)}>
+                                  Cancel
+                                </Button>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">Automatic</span>
                           )}
-                          {r.status === 'pending' && (
-                            <Button size="sm" variant="ghost" className="text-destructive" onClick={() => cancelRequest(r)}>
-                              Cancel
-                            </Button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
               {requests.length === 0 && <p className="text-muted-foreground text-center py-8">No payment requests yet.</p>}
